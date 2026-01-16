@@ -1,0 +1,334 @@
+# Agent Definitions with Roles and Constraints
+# This file defines all available agents with their roles, capabilities, and guardrails
+
+agents:
+  # ============================================================================
+  # CALCULATOR AGENT - Restricted role with guardrails
+  # ============================================================================
+  - name: "calculator"
+    type: "direct"
+    direct_tool:
+      module: "examples.sample_calculator"
+      function: "calculate"
+      is_async: false
+
+    capabilities:
+      - "math"
+      - "calculation"
+      - "arithmetic"
+
+    # Role definition with constraints
+    role:
+      name: "math-processor"
+      description: "Performs mathematical calculations with strict input validation"
+      allowed_operations:
+        - "add"
+        - "subtract"
+        - "multiply"
+        - "divide"
+        - "power"
+        - "sqrt"
+      denied_operations:
+        - "exec"  # No code execution
+        - "eval"  # No eval
+      max_execution_time: 5  # 5 seconds max
+      max_input_size: 10000  # 10KB max input
+      require_approval: false
+      guardrails:
+        max_operands: 100  # Max 100 numbers in calculation
+        min_operand_value: -1000000
+        max_operand_value: 1000000
+        allow_division_by_zero: false
+
+    # Execution constraints
+    constraints:
+      max_retries: 2
+      timeout: 5
+      rate_limit: 60  # 60 calls per minute
+      require_validation: false
+      allowed_input_fields:
+        - "operation"
+        - "operands"
+        - "query"
+        - "parameters"
+      denied_input_fields:
+        - "code"
+        - "script"
+        - "command"
+      output_sanitization: true
+      log_level: "INFO"
+
+    fallback: null
+    enabled: true
+    metadata:
+      description: "Safe mathematical calculator with input validation"
+      version: "1.0.0"
+      owner: "system"
+
+  # ============================================================================
+  # SEARCH AGENT - Open role with logging
+  # ============================================================================
+  - name: "search"
+    type: "direct"
+    direct_tool:
+      module: "examples.sample_search"
+      function: "search_documents"
+      is_async: true
+
+    capabilities:
+      - "search"
+      - "retrieval"
+      - "query"
+      - "information"
+
+    # Role definition - more permissive
+    role:
+      name: "information-retriever"
+      description: "Searches and retrieves information from documents"
+      allowed_operations:
+        - "*"  # All operations allowed
+      denied_operations:
+        - "delete"  # No deletion
+        - "modify"  # No modification
+      max_execution_time: 10
+      max_input_size: 50000  # 50KB
+      require_approval: false
+      guardrails:
+        max_results: 100
+        min_relevance_score: 0.0
+        allow_fuzzy_search: true
+        safe_search: true  # Filter inappropriate content
+
+    constraints:
+      max_retries: 3
+      timeout: 10
+      rate_limit: 30  # 30 calls per minute
+      require_validation: false
+      allowed_input_fields:
+        - "*"  # All fields allowed
+      denied_input_fields:
+        - "admin"
+        - "password"
+        - "secret"
+      output_sanitization: true
+      log_level: "DEBUG"  # More detailed logging
+
+    fallback: null
+    enabled: true
+    metadata:
+      description: "Document search with safe search enabled"
+      version: "1.0.0"
+      index_size: "1000 documents"
+
+  # ============================================================================
+  # DATA PROCESSOR - Restricted with validation required
+  # ============================================================================
+  - name: "data_processor"
+    type: "direct"
+    direct_tool:
+      module: "examples.sample_data_processor"
+      function: "process_data"
+      is_async: false
+
+    capabilities:
+      - "data"
+      - "transform"
+      - "json"
+      - "csv"
+      - "processing"
+
+    # Strict role for data processing
+    role:
+      name: "data-transformer"
+      description: "Transforms and processes structured data with validation"
+      allowed_operations:
+        - "transform"
+        - "filter"
+        - "aggregate"
+        - "sort"
+      denied_operations:
+        - "delete_all"
+        - "drop_database"
+        - "truncate"
+      max_execution_time: 30  # 30 seconds for large datasets
+      max_input_size: 1000000  # 1MB max
+      require_approval: false
+      guardrails:
+        max_records: 10000  # Max 10K records
+        max_field_size: 10000  # Max 10KB per field
+        allow_nested_data: true
+        max_nesting_depth: 5
+
+    constraints:
+      max_retries: 2
+      timeout: 30
+      rate_limit: 20  # 20 calls per minute
+      require_validation: true  # Must validate output
+      allowed_input_fields:
+        - "data"
+        - "operation"
+        - "filters"
+        - "query"
+      denied_input_fields:
+        - "raw_sql"
+        - "query_string"
+        - "script"
+      output_sanitization: true
+      log_level: "INFO"
+
+    fallback: null
+    enabled: true
+    metadata:
+      description: "Data processing with strict validation"
+      version: "1.0.0"
+      supported_formats: ["json", "dict"]
+
+  # ============================================================================
+  # WEATHER AGENT (MCP) - Example MCP server with role
+  # ============================================================================
+  # NOTE: Disabled by default - requires MCP server running
+  # To enable:
+  #   1. Start the weather MCP server: python examples/sample_weather_server.py
+  #   2. Set enabled to true
+  #   3. Restart orchestrator
+  - name: "weather"
+    type: "mcp"
+    connection:
+      url: "${MCP_WEATHER_URL:stdio}"  # Use stdio transport for local testing
+      timeout: 30
+      headers: {}
+
+    capabilities:
+      - "weather"
+      - "forecast"
+      - "climate"
+      - "external-api"
+
+    # Role for external API calls
+    role:
+      name: "weather-provider"
+      description: "Provides weather information via external API"
+      allowed_operations:
+        - "get_weather"
+        - "get_forecast"
+      denied_operations:
+        - "set_weather"  # No write operations
+        - "delete"
+      max_execution_time: 15  # Network calls may take longer
+      max_input_size: 5000
+      require_approval: false
+      guardrails:
+        cache_results: true
+        cache_ttl: 300  # 5 minutes
+        require_valid_location: true
+
+    constraints:
+      max_retries: 3
+      timeout: 15
+      rate_limit: 10  # 10 calls per minute (respect API limits)
+      require_validation: false
+      allowed_input_fields:
+        - "city"
+        - "location"
+        - "coordinates"
+        - "query"
+      denied_input_fields:
+        - "api_key"  # Don't accept API key in input
+        - "credentials"
+      output_sanitization: true
+      log_level: "INFO"
+
+    fallback: null
+    enabled: false  # Disabled - no MCP server running
+    metadata:
+      description: "Weather data via external API (mock)"
+      version: "1.0.0"
+      api_provider: "mock"
+
+  # ============================================================================
+  # ADMIN AGENT - High privilege role requiring approval
+  # ============================================================================
+  - name: "admin_agent"
+    type: "direct"
+    direct_tool:
+      module: "examples.sample_admin"
+      function: "get_system_status"  # Default function (agent has multiple)
+      is_async: false
+
+    capabilities:
+      - "admin"
+      - "privileged"
+      - "system"
+      - "monitoring"
+      - "user_management"
+
+    # Restricted admin role requiring human approval
+    role:
+      name: "system-administrator"
+      description: "Administrative operations requiring human approval"
+      allowed_operations:
+        - "get_system_status"
+        - "list_users"
+        - "analyze_logs"
+        - "generate_report"
+        - "restart_service"
+        - "update_user_permissions"
+        - "clear_cache"
+      denied_operations:
+        - "delete_database"
+        - "modify_system_config"
+        - "shutdown_system"
+        - "delete_user"
+      max_execution_time: 60
+      max_input_size: 10000
+      require_approval: true  # REQUIRES HUMAN APPROVAL
+      guardrails:
+        require_audit_log: true
+        require_justification: true
+        allowed_users: ["admin", "supervisor"]
+
+    constraints:
+      max_retries: 1  # No auto-retry for admin operations
+      timeout: 60
+      rate_limit: 5  # Very limited rate
+      require_validation: true
+      allowed_input_fields:
+        - "operation"
+        - "parameters"
+        - "justification"
+      denied_input_fields:
+        - "bypass"
+        - "override"
+      output_sanitization: true
+      log_level: "WARNING"  # Log everything
+
+    fallback: null
+    enabled: false  # Disabled by default
+    metadata:
+      description: "Administrative agent with strict controls"
+      version: "1.0.0"
+      risk_level: "high"
+      requires_approval: true
+
+# ============================================================================
+# ROLE TEMPLATES - Reference for creating new agents
+# ============================================================================
+#
+# Role Names:
+#   - data-analyst: Read-only data analysis
+#   - code-reviewer: Code review and quality checks
+#   - content-generator: Content creation
+#   - system-monitor: System monitoring and alerts
+#   - security-scanner: Security vulnerability scanning
+#
+# Constraint Levels:
+#   - Low: rate_limit > 30, timeout > 30s, require_approval: false
+#   - Medium: rate_limit 10-30, timeout 10-30s, require_validation: true
+#   - High: rate_limit < 10, timeout < 10s, require_approval: true
+#
+# Guardrails Examples:
+#   - max_records: Limit data processing
+#   - allowed_domains: Restrict network access
+#   - content_filter: Filter inappropriate content
+#   - pii_detection: Detect and block PII
+#   - cost_limit: Limit API costs

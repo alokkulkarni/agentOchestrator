@@ -1,0 +1,103 @@
+# Routing Rules Configuration
+# Rules are evaluated in priority order (highest first)
+# When a rule matches, the specified agents are called
+
+rules:
+  # High-priority rule for math/calculation queries
+  - name: "math_queries"
+    priority: 100
+    conditions:
+      - field: "query"
+        operator: "contains"
+        value: "calculate"
+        case_sensitive: false
+      - field: "query"
+        operator: "regex"
+        value: "\\d+\\s*[+\\-*/]\\s*\\d+"
+        case_sensitive: false
+    logic: "or"  # Match if ANY condition is true
+    target_agents:
+      - "calculator"
+    confidence: 0.95
+    enabled: true
+
+  # Rule for search/retrieval queries
+  - name: "search_queries"
+    priority: 90
+    conditions:
+      - field: "query"
+        operator: "contains"
+        value: "search"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "find"
+        case_sensitive: false
+    logic: "or"
+    target_agents:
+      - "search"
+    confidence: 0.85
+    enabled: true
+
+  # Rule for weather-related queries
+  - name: "weather_queries"
+    priority: 85
+    conditions:
+      - field: "query"
+        operator: "contains"
+        value: "weather"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "forecast"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "temperature"
+        case_sensitive: false
+    logic: "or"
+    target_agents:
+      - "weather"
+    confidence: 0.90
+    enabled: true
+
+  # Rule for data transformation queries
+  - name: "data_processing"
+    priority: 80
+    conditions:
+      - field: "query"
+        operator: "contains"
+        value: "transform"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "process"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "convert"
+        case_sensitive: false
+      - field: "data"
+        operator: "exists"
+        value: null
+        case_sensitive: false
+    logic: "or"
+    target_agents:
+      - "data_processor"
+    confidence: 0.80
+    enabled: true
+
+  # Catch-all rule with low priority (uses multiple agents)
+  - name: "general_query"
+    priority: 10
+    conditions:
+      - field: "query"
+        operator: "exists"
+        value: null
+        case_sensitive: false
+    logic: "and"
+    target_agents:
+      - "search"
+      - "calculator"
+    confidence: 0.5
+    enabled: false  # Disabled by default to avoid unnecessary agent calls

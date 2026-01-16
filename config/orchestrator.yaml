@@ -1,0 +1,91 @@
+# Main Orchestrator Configuration
+# This file defines the core behavior of the agent orchestrator
+
+orchestrator:
+  # Unique name for this orchestrator instance
+  name: "main-orchestrator"
+
+  # Reasoning strategy: "ai", "rule", or "hybrid"
+  # - ai: Uses AI for intelligent routing decisions
+  # - rule: Uses predefined pattern-matching rules only
+  # - hybrid: Tries rules first, falls back to AI (recommended)
+  reasoning_mode: "hybrid"
+
+  # AI Provider: "anthropic" or "bedrock"
+  # - anthropic: Uses Anthropic's Claude API directly (requires ANTHROPIC_API_KEY)
+  # - bedrock: Uses AWS Bedrock with Claude models (requires AWS credentials)
+  ai_provider: "anthropic"
+
+  # Anthropic Configuration (used when ai_provider is "anthropic")
+  # Claude model to use for AI reasoning
+  # Get API key from: https://console.anthropic.com/
+  # Set ANTHROPIC_API_KEY environment variable
+  ai_model: "claude-sonnet-4-5-20250929"
+
+  # AWS Bedrock Configuration (used when ai_provider is "bedrock")
+  # Uncomment and configure when using Bedrock
+  # bedrock:
+  #   # AWS region where Bedrock is available
+  #   region: "us-east-1"
+  #
+  #   # Bedrock model ID (must be enabled in your AWS account)
+  #   model_id: "anthropic.claude-sonnet-3-5-v2-20241022"
+  #
+  #   # Optional: IAM role ARN for cross-account access via STS assume role
+  #   # Leave null to use default AWS credentials (environment, profile, or instance role)
+  #   role_arn: null
+  #
+  #   # Session name for STS assume role (only used if role_arn is set)
+  #   session_name: "agent-orchestrator"
+  #
+  #   # Optional: AWS profile name to use from ~/.aws/credentials
+  #   # Leave null to use default credentials chain
+  #   aws_profile: null
+
+  # Maximum number of agents that can be called in parallel
+  max_parallel_agents: 3
+
+  # Default timeout for agent calls (seconds)
+  default_timeout: 30
+
+# Retry and fallback configuration
+retry_config:
+  max_attempts: 3
+  exponential_backoff: true
+  base_delay: 1.0
+  max_delay: 30.0
+  retry_on_timeout: true
+  retry_on_connection_error: true
+
+# Output validation configuration
+validation:
+  # Name of JSON schema to validate against (optional)
+  # Leave null to skip schema validation
+  schema_name: null
+  # Required fields in output (list of field names)
+  required_fields: []
+  # Fail on validation errors vs. just warn
+  strict: false
+
+# Paths to other configuration files (relative to this file)
+agents_config_path: "agents.yaml"
+rules_config_path: "rules.yaml"
+schemas_path: "schemas/"
+
+# Logging configuration
+log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+
+# Feature flags
+enable_metrics: true
+enable_audit_log: true
+
+# Response validation and hallucination detection
+# Validates responses against original query and detects hallucinations
+validation_confidence_threshold: 0.7  # Minimum confidence score (0.0-1.0)
+validation_max_retries: 2  # Retry attempts when validation fails
+
+# Per-query logging
+# Logs all agent interactions, decisions, and validations to files
+query_log_dir: "logs/queries"  # Directory for query log files
+log_queries_to_file: true  # Enable detailed per-query logging to files
+log_queries_to_console: false  # Show query summaries in console (verbose)

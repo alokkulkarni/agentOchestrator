@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Calculation Output Schema",
+  "description": "Schema for validating calculator agent outputs",
+  "type": "object",
+  "required": ["result", "operation"],
+  "properties": {
+    "result": {
+      "type": "number",
+      "description": "The calculated result"
+    },
+    "operation": {
+      "type": "string",
+      "description": "The operation performed",
+      "enum": ["add", "subtract", "multiply", "divide", "power", "sqrt"]
+    },
+    "operands": {
+      "type": "array",
+      "description": "The input operands",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 1
+    },
+    "expression": {
+      "type": "string",
+      "description": "The original expression evaluated"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "precision": {
+          "type": "integer",
+          "description": "Decimal precision used"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the calculation was performed"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,120 @@
+# Orchestrator Configuration - AWS Bedrock Example
+# This file shows how to configure the orchestrator to use AWS Bedrock instead of Anthropic API
+
+orchestrator:
+  # Unique name for this orchestrator instance
+  name: "bedrock-orchestrator"
+
+  # Reasoning strategy: "ai", "rule", or "hybrid"
+  # - ai: Uses AI for intelligent routing decisions
+  # - rule: Uses predefined pattern-matching rules only
+  # - hybrid: Tries rules first, falls back to AI (recommended)
+  reasoning_mode: "hybrid"
+
+  # AI Provider: "bedrock" for AWS Bedrock
+  ai_provider: "bedrock"
+
+  # AWS Bedrock Configuration
+  bedrock:
+    # AWS region where Bedrock is available
+    # Common regions: us-east-1, us-west-2, eu-west-1, ap-southeast-1
+    region: "eu-west-2"
+
+    # Bedrock model ID (must be enabled in your AWS account)
+    # Available Claude models on Bedrock:
+    # - anthropic.claude-3-5-sonnet-20241022-v2:0
+    # - anthropic.claude-sonnet-3-5-v2-20241022 (older format)
+    # - anthropic.claude-3-opus-20240229-v1:0
+    model_id: "anthropic.claude-sonnet-3-5-v2-20241022"
+
+    # Optional: IAM role ARN for cross-account access via STS assume role
+    # Example: "arn:aws:iam::123456789012:role/BedrockAccessRole"
+    # Leave null to use default AWS credentials (environment, profile, or instance role)
+    role_arn: null
+
+    # Session name for STS assume role (only used if role_arn is set)
+    session_name: "agent-orchestrator"
+
+    # Optional: AWS profile name to use from ~/.aws/credentials
+    # Example: "bedrock-dev" to use [bedrock-dev] profile
+    # Leave null to use default credentials chain
+    aws_profile: null
+
+  # Maximum number of agents that can be called in parallel
+  max_parallel_agents: 3
+
+  # Default timeout for agent calls (seconds)
+  default_timeout: 30
+
+# Retry and fallback configuration
+retry_config:
+  max_attempts: 3
+  exponential_backoff: true
+  base_delay: 1.0
+  max_delay: 30.0
+  retry_on_timeout: true
+  retry_on_connection_error: true
+
+# Output validation configuration
+validation:
+  # Name of JSON schema to validate against (optional)
+  schema_name: null
+  required_fields: []
+  strict: false
+
+# Paths to other configuration files (relative to this file)
+agents_config_path: "agents.yaml"
+rules_config_path: "rules.yaml"
+schemas_path: "schemas/"
+
+# Logging configuration
+log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+
+# Feature flags
+enable_metrics: true
+enable_audit_log: true
+
+# ============================================================================
+# AWS Credentials Setup Notes:
+# ============================================================================
+#
+# Option 1: Environment Variables (Recommended for local development)
+#   export AWS_ACCESS_KEY_ID="your-access-key"
+#   export AWS_SECRET_ACCESS_KEY="your-secret-key"
+#   export AWS_REGION="us-east-1"  # optional
+#
+# Option 2: AWS Profile (for multiple accounts)
+#   Configure ~/.aws/credentials with profiles:
+#   [default]
+#   aws_access_key_id = your-access-key
+#   aws_secret_access_key = your-secret-key
+#
+#   [bedrock-dev]
+#   aws_access_key_id = dev-access-key
+#   aws_secret_access_key = dev-secret-key
+#
+#   Then set aws_profile: "bedrock-dev" above
+#
+# Option 3: IAM Instance Profile (for EC2/ECS/Lambda)
+#   Attach IAM role with bedrock:InvokeModel permission to your instance
+#   No credentials needed in code
+#
+# Option 4: STS Assume Role (for cross-account access)
+#   Set role_arn above and ensure your credentials can assume that role
+#
+# Required IAM Permissions:
+#   {
+#     "Version": "2012-10-17",
+#     "Statement": [
+#       {
+#         "Effect": "Allow",
+#         "Action": [
+#           "bedrock:InvokeModel",
+#           "bedrock:InvokeModelWithResponseStream"
+#         ],
+#         "Resource": "arn:aws:bedrock:*::foundation-model/anthropic.claude-*"
+#       }
+#     ]
+#   }
+#
+# ============================================================================
