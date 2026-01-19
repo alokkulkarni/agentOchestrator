@@ -110,3 +110,50 @@ validation_max_retries: 2  # Retry attempts when validation fails
 query_log_dir: "logs/queries"  # Directory for query log files
 log_queries_to_file: true  # Enable detailed per-query logging to files
 log_queries_to_console: false  # Show query summaries in console (verbose)
+
+# Observability Configuration
+# Full production-grade observability with metrics, tracing, cost tracking, and structured logging
+observability:
+  # Distributed Tracing (OpenTelemetry with OTLP)
+  # Enables request tracing across services for debugging and performance analysis
+  enable_tracing: true
+  # OTLP collector endpoint (e.g., Jaeger, Tempo, or custom collector)
+  # Set to null to disable trace export (tracing still works locally)
+  # When running with Docker Compose monitoring profile, Jaeger is available at http://jaeger:4317
+  # For local development: "http://localhost:4317"
+  # Can be overridden via OTEL_EXPORTER_OTLP_ENDPOINT environment variable
+  otlp_endpoint: null
+  # Enable console trace output for debugging (verbose)
+  enable_console_traces: false
+
+  # Prometheus Metrics
+  # Real-time metrics for dashboards and alerts
+  enable_metrics: true
+  # Port for Prometheus scraping endpoint
+  metrics_port: 9090
+
+  # Structured JSON Logging
+  # Machine-parseable logs with automatic field enrichment
+  enable_structured_logging: true
+  # Log file path (null = console only)
+  log_file: "logs/orchestrator.log"
+  # Enable automatic log rotation (size-based and time-based)
+  enable_log_rotation: true
+  # Maximum log file size before rotation (10MB default)
+  log_max_bytes: 10485760  # 10 * 1024 * 1024
+  # Number of backup log files to keep
+  log_backup_count: 5
+
+  # PII Sanitization
+  # Automatically redacts sensitive data (emails, API keys, tokens) from logs
+  enable_sanitization: true
+
+  # AI Reasoner Cost Tracking
+  # Track token usage and API costs for Claude reasoning calls
+  enable_cost_tracking: true
+
+  # Session and Correlation ID Tracking
+  # Track multi-request conversations and correlate requests across services
+  enable_session_tracking: true
+  # Session timeout in hours (sessions inactive for this long are removed)
+  session_timeout_hours: 1

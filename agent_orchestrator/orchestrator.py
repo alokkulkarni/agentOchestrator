@@ -7,11 +7,13 @@ This module provides the core Orchestrator class that ties together all componen
 - Output validation and formatting
 - Retry and fallback logic
 - Security validation
+- Observability (metrics, tracing, logging)
 """
 
 import asyncio
 import logging
 import os
+import time
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -23,6 +25,24 @@ from .config import (
     ConfigurationError,
     load_all_configs,
     OrchestratorConfig,
+)
+from .observability import (
+    orchestrator_metrics,
+    metrics_server,
+    init_tracing,
+    get_tracer,
+    create_span,
+    end_span,
+    TracingContext,
+    orchestrator_cost_tracker,
+    sanitize_data,
+    setup_orchestrator_logging,
+    get_logger as get_structured_logger,
+    RequestContext,
+    set_correlation_id,
+    set_session_id,
+    get_correlation_id,
+    get_session_id,
 )
 from .reasoning import AIReasoner, BedrockReasoner, GatewayReasoner, HybridReasoner, RuleEngine
 from .utils import (
@@ -37,6 +57,7 @@ from .utils import (
 from .validation import OutputFormatter, ResponseValidator, SchemaValidator
 
 logger = logging.getLogger(__name__)
+structured_logger = None  # Will be initialized in __init__
 
 
 class Orchestrator:
@@ -75,7 +96,10 @@ class Orchestrator:
             logger.error(f"Configuration error: {e}")
             raise
 
-        # Setup logging
+        # Setup observability
+        self._setup_observability()
+
+        # Setup logging (traditional)
         setup_logging(level=self.config.log_level)
 
         # Initialize components
@@ -187,6 +211,61 @@ class Orchestrator:
 
         logger.info(f"Orchestrator initialized: {self.config.name}")
 
+    def _setup_observability(self):
+        """Initialize observability components (metrics, tracing, logging)."""
+        global structured_logger
+        obs_config = self.config.observability
+
+        # 1. Setup distributed tracing (OpenTelemetry with OTLP)
+        if obs_config.enable_tracing:
+            try:
+                # Allow environment variable to override config
+                otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT") or obs_config.otlp_endpoint
+
+                init_tracing(
+                    service_name=self.config.name,
+                    service_version="1.0.0",
+                    otlp_endpoint=otlp_endpoint,
+                    enable_console=obs_config.enable_console_traces,
+                )
+                logger.info(
+                    f"Distributed tracing initialized "
+                    f"(OTLP endpoint: {otlp_endpoint or 'None'})"
+                )
+            except Exception as e:
+                logger.warning(f"Failed to initialize tracing: {e}")
+
+        # 2. Setup structured logging
+        if obs_config.enable_structured_logging:
+            try:
+                setup_orchestrator_logging(
+                    log_level=self.config.log_level,
+                    log_file=obs_config.log_file,
+                    enable_console=True,
+                    json_format=True,
+                    enable_rotation=obs_config.enable_log_rotation,
+                    max_bytes=obs_config.log_max_bytes,
+                    backup_count=obs_config.log_backup_count,
+                    sanitize_logs=obs_config.enable_sanitization,
+                )
+                structured_logger = get_structured_logger(__name__)
+                logger.info("Structured JSON logging initialized")
+            except Exception as e:
+                logger.warning(f"Failed to initialize structured logging: {e}")
+
+        # 3. Start metrics HTTP server for Prometheus scraping
+        if obs_config.enable_metrics:
+            try:
+                metrics_server.port = obs_config.metrics_port
+                metrics_server.start_in_background()
+                logger.info(f"Prometheus metrics server starting on port {obs_config.metrics_port}")
+            except Exception as e:
+                logger.warning(f"Failed to start metrics server: {e}")
+
+        # 4. Cost tracking is always available via orchestrator_cost_tracker singleton
+        if obs_config.enable_cost_tracking:
+            logger.info("AI reasoner cost tracking enabled")
+
     async def initialize(self) -> None:
         """
         Initialize orchestrator by loading and registering all agents.
@@ -257,6 +336,7 @@ class Orchestrator:
         input_data: Dict[str, Any],
         validate_input_security: bool = True,
         request_id: Optional[str] = None,
+        session_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Process input through the orchestrator.
@@ -267,11 +347,13 @@ class Orchestrator:
         - Confidence scoring (logged, not sent to user)
         - Retry on validation failure
         - Comprehensive per-query logging
+        - Full observability (metrics, tracing, cost tracking)
 
         Args:
             input_data: Input data to process
             validate_input_security: Whether to validate input for security issues
-            request_id: Optional request ID for tracking
+            request_id: Optional request ID for tracking (correlation ID)
+            session_id: Optional session ID for multi-request conversations
 
         Returns:
             Formatted output dictionary with results
@@ -279,29 +361,94 @@ class Orchestrator:
         if not self._initialized:
             raise RuntimeError("Orchestrator not initialized. Call initialize() first.")
 
-        # Generate request ID if not provided
+        # Generate request ID if not provided (correlation ID)
         request_id = request_id or str(uuid.uuid4())
         start_time = datetime.utcnow()
+        start_time_monotonic = time.time()
 
-        logger.info(f"Processing request {request_id}")
-        self._request_count += 1
+        # Setup request context (correlation ID and session ID)
+        with RequestContext(correlation_id=request_id, session_id=session_id):
+            logger.info(
+                f"Processing request {request_id} "
+                f"(session: {get_session_id() or 'N/A'})"
+            )
+            self._request_count += 1
 
+            # Update metrics - active queries
+            orchestrator_metrics.active_queries.inc()
+
+            try:
+                # Create distributed tracing span for entire query
+                return await self._process_with_observability(
+                    input_data=input_data,
+                    validate_input_security=validate_input_security,
+                    request_id=request_id,
+                    start_time=start_time,
+                    start_time_monotonic=start_time_monotonic,
+                )
+            finally:
+                # Always decrement active queries
+                orchestrator_metrics.active_queries.dec()
+
+    async def _process_with_observability(
+        self,
+        input_data: Dict[str, Any],
+        validate_input_security: bool,
+        request_id: str,
+        start_time: datetime,
+        start_time_monotonic: float,
+    ) -> Dict[str, Any]:
+        """Process request with full observability integration."""
         # Create query logging context
         query_context = self.query_logger.create_query_context(input_data)
 
-        try:
-            # Step 1: Security validation
-            if validate_input_security:
-                try:
-                    validate_input(input_data)
-                except SecurityError as e:
-                    error_msg = f"Security validation failed: {e}"
-                    logger.error(error_msg)
+        # Create distributed tracing span for query
+        with TracingContext("orchestrator.process_query") as span:
+            span.set_attribute("request_id", request_id)
+            span.set_attribute("reasoning_mode", self.config.reasoning_mode)
+
+            try:
+                # Step 1: Security validation
+                if validate_input_security:
+                    with TracingContext("orchestrator.security_validation"):
+                        try:
+                            validate_input(input_data)
+                        except SecurityError as e:
+                            error_msg = f"Security validation failed: {e}"
+                            logger.error(error_msg)
+                            self.query_logger.log_error(
+                                query_context,
+                                error_type="SecurityError",
+                                error_message=error_msg,
+                            )
+
+                            # Record metrics
+                            orchestrator_metrics.queries_failed.labels(
+                                reasoning_mode=self.config.reasoning_mode
+                            ).inc()
+
+                            output = self.output_formatter.create_error_output(
+                                error_message=error_msg,
+                                request_id=request_id,
+                            )
+                            self.query_logger.finalize_query_log(query_context, output)
+                            return output
+
+                # Step 2: Reasoning - determine which agents to call
+                reasoning_result = await self._reason_with_observability(input_data, span)
+                if not reasoning_result:
+                    error_msg = "No agents could be determined for this request"
                     self.query_logger.log_error(
                         query_context,
-                        error_type="SecurityError",
+                        error_type="ReasoningError",
                         error_message=error_msg,
                     )
+
+                    # Record metrics
+                    orchestrator_metrics.queries_failed.labels(
+                        reasoning_mode=self.config.reasoning_mode
+                    ).inc()
+
                     output = self.output_formatter.create_error_output(
                         error_message=error_msg,
                         request_id=request_id,
@@ -309,82 +456,97 @@ class Orchestrator:
                     self.query_logger.finalize_query_log(query_context, output)
                     return output
 
-            # Step 2: Reasoning - determine which agents to call
-            reasoning_result = await self._reason(input_data)
-            if not reasoning_result:
-                error_msg = "No agents could be determined for this request"
+                # Log reasoning decision
+                self.query_logger.log_reasoning(
+                    query_context,
+                    reasoning_mode=self.config.reasoning_mode,
+                    reasoning_result={
+                        "agents": reasoning_result.agents,
+                        "confidence": reasoning_result.confidence,
+                        "method": reasoning_result.method,
+                        "reasoning": reasoning_result.reasoning,
+                        "parallel": reasoning_result.parallel,
+                        "parameters": reasoning_result.parameters,
+                    },
+                )
+
+                logger.info(
+                    f"Reasoning complete: {len(reasoning_result.agents)} agent(s) selected "
+                    f"(method={reasoning_result.method}, confidence={reasoning_result.confidence:.2f})"
+                )
+
+                # Step 3: Execute agents with validation and retry
+                max_retries = getattr(self.config, 'validation_max_retries', 2)
+                output = await self._execute_and_validate(
+                    query_context=query_context,
+                    input_data=input_data,
+                    reasoning_result=reasoning_result,
+                    request_id=request_id,
+                    max_retries=max_retries,
+                    parent_span=span,
+                )
+
+                # Step 4: Record execution history
+                if self.config.enable_audit_log:
+                    self._record_execution(
+                        request_id=request_id,
+                        input_data=input_data,
+                        reasoning_result=reasoning_result,
+                        agent_responses=[],  # Not available in new flow
+                        output=output,
+                        start_time=start_time,
+                    )
+
+                # Finalize query log
+                self.query_logger.finalize_query_log(query_context, output)
+
+                # Record success metrics
+                duration_seconds = time.time() - start_time_monotonic
+                orchestrator_metrics.queries_total.labels(
+                    status="success",
+                    reasoning_mode=self.config.reasoning_mode
+                ).inc()
+                orchestrator_metrics.queries_success.labels(
+                    reasoning_mode=self.config.reasoning_mode
+                ).inc()
+                orchestrator_metrics.query_duration.labels(
+                    reasoning_mode=self.config.reasoning_mode
+                ).observe(duration_seconds)
+
+                # Update session metrics
+                orchestrator_metrics.queries_per_session.observe(1)
+
+                logger.info(f"Request {request_id} completed successfully in {duration_seconds:.3f}s")
+                return output
+
+            except Exception as e:
+                logger.error(f"Error processing request {request_id}: {e}", exc_info=True)
                 self.query_logger.log_error(
                     query_context,
-                    error_type="ReasoningError",
-                    error_message=error_msg,
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    error_details={"traceback": str(e)},
                 )
+
+                # Record failure metrics
+                duration_seconds = time.time() - start_time_monotonic
+                orchestrator_metrics.queries_total.labels(
+                    status="failed",
+                    reasoning_mode=self.config.reasoning_mode
+                ).inc()
+                orchestrator_metrics.queries_failed.labels(
+                    reasoning_mode=self.config.reasoning_mode
+                ).inc()
+                orchestrator_metrics.query_duration.labels(
+                    reasoning_mode=self.config.reasoning_mode
+                ).observe(duration_seconds)
+
                 output = self.output_formatter.create_error_output(
-                    error_message=error_msg,
+                    error_message=f"Orchestration error: {str(e)}",
                     request_id=request_id,
                 )
                 self.query_logger.finalize_query_log(query_context, output)
                 return output
-
-            # Log reasoning decision
-            self.query_logger.log_reasoning(
-                query_context,
-                reasoning_mode=self.config.reasoning_mode,
-                reasoning_result={
-                    "agents": reasoning_result.agents,
-                    "confidence": reasoning_result.confidence,
-                    "method": reasoning_result.method,
-                    "reasoning": reasoning_result.reasoning,
-                    "parallel": reasoning_result.parallel,
-                    "parameters": reasoning_result.parameters,
-                },
-            )
-
-            logger.info(
-                f"Reasoning complete: {len(reasoning_result.agents)} agent(s) selected "
-                f"(method={reasoning_result.method}, confidence={reasoning_result.confidence:.2f})"
-            )
-
-            # Step 3: Execute agents with validation and retry
-            max_retries = getattr(self.config, 'validation_max_retries', 2)
-            output = await self._execute_and_validate(
-                query_context=query_context,
-                input_data=input_data,
-                reasoning_result=reasoning_result,
-                request_id=request_id,
-                max_retries=max_retries,
-            )
-
-            # Step 4: Record execution history
-            if self.config.enable_audit_log:
-                self._record_execution(
-                    request_id=request_id,
-                    input_data=input_data,
-                    reasoning_result=reasoning_result,
-                    agent_responses=[],  # Not available in new flow
-                    output=output,
-                    start_time=start_time,
-                )
-
-            # Finalize query log
-            self.query_logger.finalize_query_log(query_context, output)
-
-            logger.info(f"Request {request_id} completed successfully")
-            return output
-
-        except Exception as e:
-            logger.error(f"Error processing request {request_id}: {e}", exc_info=True)
-            self.query_logger.log_error(
-                query_context,
-                error_type=type(e).__name__,
-                error_message=str(e),
-                error_details={"traceback": str(e)},
-            )
-            output = self.output_formatter.create_error_output(
-                error_message=f"Orchestration error: {str(e)}",
-                request_id=request_id,
-            )
-            self.query_logger.finalize_query_log(query_context, output)
-            return output
 
     async def _reason(self, input_data: Dict[str, Any]):
         """Determine which agents to call using configured reasoning mode."""
@@ -410,6 +572,67 @@ class Orchestrator:
         else:
             logger.error(f"Invalid reasoning mode: {self.config.reasoning_mode}")
             return None
+
+    async def _reason_with_observability(self, input_data: Dict[str, Any], parent_span):
+        """Reasoning with full observability (metrics, tracing, cost tracking)."""
+        start_time = time.time()
+
+        # Create span for reasoning
+        with TracingContext("orchestrator.reasoning") as reasoning_span:
+            reasoning_span.set_attribute("reasoning_mode", self.config.reasoning_mode)
+
+            # Execute reasoning
+            reasoning_result = await self._reason(input_data)
+
+            if not reasoning_result:
+                return None
+
+            # Record reasoning metrics
+            duration_seconds = time.time() - start_time
+            orchestrator_metrics.reasoning_decisions.labels(
+                reasoning_mode=self.config.reasoning_mode,
+                method=reasoning_result.method
+            ).inc()
+            orchestrator_metrics.reasoning_confidence.observe(reasoning_result.confidence)
+            orchestrator_metrics.reasoning_duration.labels(
+                reasoning_mode=self.config.reasoning_mode
+            ).observe(duration_seconds)
+
+            # Add attributes to span
+            reasoning_span.set_attribute("agents_selected", len(reasoning_result.agents))
+            reasoning_span.set_attribute("confidence", reasoning_result.confidence)
+            reasoning_span.set_attribute("method", reasoning_result.method)
+            reasoning_span.set_attribute("parallel", reasoning_result.parallel)
+
+            # Track AI reasoner cost if AI was used
+            if self.config.observability.enable_cost_tracking and reasoning_result.method in ["ai", "hybrid"]:
+                # Check if AI reasoner has usage data
+                if hasattr(self.ai_reasoner, "last_usage") and self.ai_reasoner.last_usage:
+                    usage = self.ai_reasoner.last_usage
+                    cost_data = orchestrator_cost_tracker.track_reasoning_cost(
+                        model=usage.get("model", self.config.ai_model),
+                        input_tokens=usage.get("input_tokens", 0),
+                        output_tokens=usage.get("output_tokens", 0),
+                        provider=self.config.ai_provider,
+                    )
+
+                    # Record cost metrics
+                    orchestrator_metrics.ai_reasoner_cost.labels(
+                        provider=self.config.ai_provider,
+                        model=usage.get("model", self.config.ai_model)
+                    ).inc(cost_data["cost_usd"])
+                    orchestrator_metrics.ai_reasoner_tokens.labels(
+                        provider=self.config.ai_provider,
+                        model=usage.get("model", self.config.ai_model),
+                        token_type="input"
+                    ).inc(cost_data["input_tokens"])
+                    orchestrator_metrics.ai_reasoner_tokens.labels(
+                        provider=self.config.ai_provider,
+                        model=usage.get("model", self.config.ai_model),
+                        token_type="output"
+                    ).inc(cost_data["output_tokens"])
+
+            return reasoning_result
 
     async def _execute_agents(
         self,
@@ -486,6 +709,7 @@ class Orchestrator:
         reasoning_result,
         request_id: str,
         max_retries: int = 2,
+        parent_span=None,
     ) -> Dict[str, Any]:
         """
         Execute agents with validation and retry on failure.
@@ -511,25 +735,41 @@ class Orchestrator:
         retry_attempt = 0
 
         while retry_attempt <= max_retries:
-            # Execute agents
-            agent_responses = await self._execute_agents(
-                reasoning_result.agents,
-                input_data,
-                reasoning_result.parallel,
-                reasoning_result.parameters,
-            )
+            # Execute agents with tracing
+            with TracingContext("orchestrator.execute_agents") as exec_span:
+                exec_span.set_attribute("agents", str(reasoning_result.agents))
+                exec_span.set_attribute("parallel", reasoning_result.parallel)
+                exec_span.set_attribute("retry_attempt", retry_attempt)
 
-            # Log agent interactions
-            for response in agent_responses:
-                self.query_logger.log_agent_interaction(
-                    query_context,
-                    agent_name=response.agent_name,
-                    input_data=input_data,
-                    output_data=response.data if response.success else {},
-                    success=response.success,
-                    execution_time_ms=response.execution_time * 1000,
-                    error=response.error if not response.success else None,
+                # Execute agents
+                agent_responses = await self._execute_agents(
+                    reasoning_result.agents,
+                    input_data,
+                    reasoning_result.parallel,
+                    reasoning_result.parameters,
                 )
+
+                # Log agent interactions and record metrics
+                for response in agent_responses:
+                    self.query_logger.log_agent_interaction(
+                        query_context,
+                        agent_name=response.agent_name,
+                        input_data=input_data,
+                        output_data=response.data if response.success else {},
+                        success=response.success,
+                        execution_time_ms=response.execution_time * 1000,
+                        error=response.error if not response.success else None,
+                    )
+
+                    # Record agent metrics
+                    status = "success" if response.success else "failed"
+                    orchestrator_metrics.agent_calls.labels(
+                        agent=response.agent_name,
+                        status=status
+                    ).inc()
+                    orchestrator_metrics.agent_duration.labels(
+                        agent=response.agent_name
+                    ).observe(response.execution_time)
 
             # Schema validation (existing)
             validated_responses = self._validate_outputs(agent_responses)
@@ -548,11 +788,16 @@ class Orchestrator:
             agent_response_data = output.get("data", {})
 
             # Validate response against original query
-            validation_result = await self.response_validator.validate_response(
-                user_query=input_data,
-                agent_responses=agent_response_data,
-                reasoning=reasoning_result.__dict__ if reasoning_result else None,
-            )
+            with TracingContext("orchestrator.validate_response") as val_span:
+                validation_result = await self.response_validator.validate_response(
+                    user_query=input_data,
+                    agent_responses=agent_response_data,
+                    reasoning=reasoning_result.__dict__ if reasoning_result else None,
+                )
+
+                val_span.set_attribute("is_valid", validation_result.is_valid)
+                val_span.set_attribute("confidence", validation_result.confidence_score)
+                val_span.set_attribute("hallucination_detected", validation_result.hallucination_detected)
 
             # Log validation results (including confidence score)
             self.query_logger.log_validation(
@@ -560,6 +805,13 @@ class Orchestrator:
                 validation_result=validation_result.to_dict(),
                 retry_on_failure=(retry_attempt < max_retries and not validation_result.is_valid),
             )
+
+            # Record validation metrics
+            status = "passed" if validation_result.is_valid else "failed"
+            orchestrator_metrics.validation_checks.labels(status=status).inc()
+            orchestrator_metrics.validation_confidence.observe(validation_result.confidence_score)
+            if validation_result.hallucination_detected:
+                orchestrator_metrics.hallucination_detected.inc()
 
             # Check if validation passed
             if validation_result.is_valid:
@@ -589,6 +841,13 @@ class Orchestrator:
                     reason=f"Validation failed: {'; '.join(validation_result.issues[:3])}",
                     agents_to_retry=reasoning_result.agents,
                 )
+
+                # Record retry metrics
+                for agent_name in reasoning_result.agents:
+                    orchestrator_metrics.agent_retries.labels(
+                        agent=agent_name,
+                        reason="validation_failed"
+                    ).inc()
 
                 logger.info(f"Retrying with same agents (attempt {retry_attempt + 1}/{max_retries + 1})")
 
@@ -662,8 +921,8 @@ class Orchestrator:
         self._initialized = False
 
     def get_stats(self) -> Dict[str, Any]:
-        """Get orchestrator statistics."""
-        return {
+        """Get orchestrator statistics including observability metrics."""
+        stats = {
             "name": self.config.name,
             "initialized": self._initialized,
             "request_count": self._request_count,
@@ -671,3 +930,25 @@ class Orchestrator:
             "reasoning": self.hybrid_reasoner.get_stats() if self.hybrid_reasoner else {},
             "schemas": self.schema_validator.list_schemas(),
         }
+
+        # Add observability stats if enabled
+        if self.config.observability.enable_cost_tracking:
+            stats["cost_tracking"] = orchestrator_cost_tracker.get_statistics()
+
+        # Add circuit breaker stats
+        circuit_breaker_stats = {}
+        for agent in self.agent_registry.get_all():
+            if self.circuit_breaker.is_open(agent.name):
+                circuit_breaker_stats[agent.name] = "open"
+                # Update circuit breaker metric
+                orchestrator_metrics.circuit_breaker_open.labels(agent=agent.name).set(1)
+            else:
+                orchestrator_metrics.circuit_breaker_open.labels(agent=agent.name).set(0)
+
+        if circuit_breaker_stats:
+            stats["circuit_breakers"] = circuit_breaker_stats
+
+        # Update system metrics
+        orchestrator_metrics.registered_agents.set(self.agent_registry.count())
+
+        return stats

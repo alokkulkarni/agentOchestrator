@@ -203,6 +203,41 @@ class GatewayConfig(BaseModel):
     api_key: Optional[str] = Field(None, description="Optional API key for gateway authentication")
 
 
+class ObservabilityConfig(BaseModel):
+    """Observability and monitoring configuration."""
+    # Distributed Tracing (OpenTelemetry with OTLP)
+    enable_tracing: bool = Field(True, description="Enable distributed tracing")
+    otlp_endpoint: Optional[str] = Field(
+        None,
+        description="OTLP collector endpoint (e.g., 'http://localhost:4317')"
+    )
+    enable_console_traces: bool = Field(False, description="Enable console trace output for debugging")
+
+    # Metrics (Prometheus)
+    enable_metrics: bool = Field(True, description="Enable Prometheus metrics")
+    metrics_port: int = Field(9090, description="Port for Prometheus metrics endpoint")
+
+    # Structured Logging
+    enable_structured_logging: bool = Field(True, description="Enable structured JSON logging")
+    log_file: Optional[str] = Field(
+        "logs/orchestrator.log",
+        description="Path to log file (None = console only)"
+    )
+    enable_log_rotation: bool = Field(True, description="Enable log rotation")
+    log_max_bytes: int = Field(10 * 1024 * 1024, description="Maximum log file size (10MB default)")
+    log_backup_count: int = Field(5, description="Number of log backup files to keep")
+
+    # PII Sanitization
+    enable_sanitization: bool = Field(True, description="Enable PII sanitization in logs")
+
+    # Cost Tracking
+    enable_cost_tracking: bool = Field(True, description="Enable AI reasoner cost tracking")
+
+    # Session Tracking
+    enable_session_tracking: bool = Field(True, description="Enable session and correlation ID tracking")
+    session_timeout_hours: int = Field(1, description="Session timeout in hours")
+
+
 class OrchestratorConfig(BaseModel):
     """Main orchestrator configuration."""
     name: str = Field("agent-orchestrator", description="Orchestrator instance name")
@@ -285,6 +320,12 @@ class OrchestratorConfig(BaseModel):
     log_queries_to_console: bool = Field(
         False,
         description="Log query summaries to console"
+    )
+
+    # Observability configuration
+    observability: ObservabilityConfig = Field(
+        default_factory=ObservabilityConfig,
+        description="Observability and monitoring configuration"
     )
 
 
