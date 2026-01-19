@@ -36,25 +36,21 @@ export TAVILY_API_KEY="tvly-..."
 # 2. Install dependencies (if not already installed)
 pip install -r requirements.txt
 
-# 3. Start the API server
+# 3. Start the API server (same as model_gateway)
+python3 -m agent_orchestrator.server
+```
+
+**Alternative methods:**
+
+```bash
+# Using uvicorn directly
 python -m uvicorn agent_orchestrator.api.server:app \
   --host 0.0.0.0 \
   --port 8001 \
   --reload
-```
 
-**Alternative: Direct Python execution**
-
-```bash
+# Using the API module directly
 python -m agent_orchestrator.api.server
-```
-
-### Option 3: Using the API Module Directly
-
-```bash
-# From the project root
-cd agent_orchestrator/api
-python server.py
 ```
 
 ---

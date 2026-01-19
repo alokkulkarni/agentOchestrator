@@ -487,7 +487,10 @@ pip install -r requirements.txt
 export ANTHROPIC_API_KEY="sk-ant-..."
 export TAVILY_API_KEY="tvly-..."
 
-# Start the API server
+# Start the API server (same as model_gateway)
+python3 -m agent_orchestrator.server
+
+# Or using uvicorn directly
 python -m uvicorn agent_orchestrator.api.server:app \
   --host 0.0.0.0 \
   --port 8001 \
