@@ -112,19 +112,19 @@ export GATEWAY_ANTHROPIC_API_KEY="your-key-here"  # Or set in .env
 python3 -m model_gateway.server
 ```
 
-The gateway will start on `http://localhost:8000`
+The gateway will start on `http://localhost:8585`
 
 ### 4. Verify Gateway is Running
 
 ```bash
 # Check gateway status
-curl http://localhost:8000/
+curl http://localhost:8585/
 
 # Check provider health
-curl http://localhost:8000/health | python3 -m json.tool
+curl http://localhost:8585/health | python3 -m json.tool
 
 # List available providers
-curl http://localhost:8000/providers | python3 -m json.tool
+curl http://localhost:8585/providers | python3 -m json.tool
 ```
 
 ## Gateway API Endpoints
@@ -245,7 +245,7 @@ orchestrator:
 
   # Gateway Configuration
   gateway:
-    url: "http://localhost:8000"
+    url: "http://localhost:8585"
     provider: "anthropic"  # or "bedrock", or null for gateway default
     model: null  # or specific model ID
     api_key: null  # if gateway requires authentication
@@ -297,7 +297,7 @@ The orchestrator includes **comprehensive retry logic and error handling** when 
 
 ```yaml
 gateway:
-  url: "http://localhost:8000"
+  url: "http://localhost:8585"
 
   # Retry settings (all optional)
   max_retries: 3  # Number of retry attempts (default: 3)
@@ -494,7 +494,7 @@ Change the `provider` field in orchestrator gateway config:
 
 ```yaml
 gateway:
-  url: "http://localhost:8000"
+  url: "http://localhost:8585"
   provider: "bedrock"  # Switch to Bedrock
 ```
 
@@ -627,7 +627,7 @@ Regular health checks via `/health` endpoint:
 ```bash
 # Check health every 30 seconds
 while true; do
-    curl -s http://localhost:8000/health | jq '.status'
+    curl -s http://localhost:8585/health | jq '.status'
     sleep 30
 done
 ```
@@ -661,13 +661,13 @@ lsof -i :8000
 
 **Check gateway is running**:
 ```bash
-curl http://localhost:8000/
+curl http://localhost:8585/
 ```
 
 **Check gateway URL in config**:
 ```yaml
 gateway:
-  url: "http://localhost:8000"  # Correct URL?
+  url: "http://localhost:8585"  # Correct URL?
 ```
 
 **Check logs**:

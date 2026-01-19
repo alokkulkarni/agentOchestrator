@@ -301,7 +301,7 @@ python3 -m model_gateway.server
 # In config/orchestrator.yaml or orchestrator.gateway.yaml
 ai_provider: "gateway"
 gateway:
-  url: "http://localhost:8000"
+  url: "http://localhost:8585"
   provider: "anthropic"  # Will fallback to bedrock if needed
 ```
 

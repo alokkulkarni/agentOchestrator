@@ -65,7 +65,7 @@ Added error tracking:
 
 1. **DEBUG** - Each retry attempt:
    ```
-   Gateway request attempt 1/3 to http://localhost:8000/v1/generate
+   Gateway request attempt 1/3 to http://localhost:8585/v1/generate
    ```
 
 2. **WARNING** - Retryable errors:
@@ -95,7 +95,7 @@ orchestrator:
   ai_provider: "gateway"
 
   gateway:
-    url: "http://localhost:8000"
+    url: "http://localhost:8585"
     provider: "anthropic"
 
     # Retry Configuration (all optional with sensible defaults)
@@ -117,7 +117,7 @@ If not specified in config, the following defaults are used:
 from agent_orchestrator.reasoning.gateway_reasoner import GatewayReasoner
 
 reasoner = GatewayReasoner(
-    gateway_url="http://localhost:8000",
+    gateway_url="http://localhost:8585",
     provider="anthropic",
     max_retries=5,  # Custom retry count
     timeout=120,  # Custom timeout
@@ -411,7 +411,7 @@ No changes required to existing orchestrator usage!
 ### Production Setup (Recommended)
 ```yaml
 gateway:
-  url: "http://localhost:8000"
+  url: "http://localhost:8585"
   provider: "anthropic"
   max_retries: 3  # Standard
   timeout: 60  # Standard
@@ -421,7 +421,7 @@ gateway:
 ### High-Reliability Setup
 ```yaml
 gateway:
-  url: "http://localhost:8000"
+  url: "http://localhost:8585"
   provider: "anthropic"
   max_retries: 5  # More attempts
   timeout: 90  # Longer timeout
@@ -431,7 +431,7 @@ gateway:
 ### Fast-Fail Setup (Development)
 ```yaml
 gateway:
-  url: "http://localhost:8000"
+  url: "http://localhost:8585"
   provider: "anthropic"
   max_retries: 1  # Fail fast
   timeout: 10  # Quick timeout

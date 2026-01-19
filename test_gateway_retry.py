@@ -32,7 +32,7 @@ async def test_normal_success():
 
     try:
         reasoner = GatewayReasoner(
-            gateway_url="http://localhost:8000",
+            gateway_url="http://localhost:8585",
             provider="anthropic",
             max_retries=3,
             timeout=60,
@@ -124,7 +124,7 @@ async def test_timeout():
 
     try:
         reasoner = GatewayReasoner(
-            gateway_url="http://localhost:8000",
+            gateway_url="http://localhost:8585",
             provider="anthropic",
             max_retries=2,
             timeout=0.1,  # Very short timeout
@@ -218,7 +218,7 @@ async def test_retry_with_valid_gateway():
 
     try:
         reasoner = GatewayReasoner(
-            gateway_url="http://localhost:8000",
+            gateway_url="http://localhost:8585",
             provider="anthropic",
             max_retries=3,
             timeout=60,
@@ -260,7 +260,7 @@ async def main():
     print("=" * 70)
     print("\nThis test suite verifies the orchestrator's retry logic")
     print("when communicating with the Model Gateway.")
-    print("\n⚠️  Make sure the Model Gateway is running on http://localhost:8000")
+    print("\n⚠️  Make sure the Model Gateway is running on http://localhost:8585")
     print("   Start it with: python3 -m model_gateway.server")
     print("=" * 70)
 

@@ -53,7 +53,7 @@ class GatewaySettings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_prefix="GATEWAY_",
-        env_file=".env",
+        env_file=["model_gateway/.env", ".env"],  # Check both locations
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -61,7 +61,7 @@ class GatewaySettings(BaseSettings):
 
     # Server settings
     host: str = Field(default="0.0.0.0", description="Server host")
-    port: int = Field(default=8000, description="Server port")
+    port: int = Field(default=8585, description="Server port")
     reload: bool = Field(default=False, description="Auto-reload on code changes")
 
     # Authentication

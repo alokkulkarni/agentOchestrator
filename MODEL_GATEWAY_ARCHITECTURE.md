@@ -662,7 +662,7 @@ Content-Type: application/json
 
 ```
 ┌─────────────┐
-│ Orchestrator│ (localhost:8000)
+│ Orchestrator│ (localhost:8585)
 │   (local)   │
 └──────┬──────┘
        │

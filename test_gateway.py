@@ -137,7 +137,7 @@ async def main():
         print("   Set it in .env or environment to test Anthropic provider")
 
     # Gateway URL
-    gateway_url = os.getenv("GATEWAY_URL", "http://localhost:8000")
+    gateway_url = os.getenv("GATEWAY_URL", "http://localhost:8585")
     print(f"\nGateway URL: {gateway_url}")
 
     # Test 1: Health check

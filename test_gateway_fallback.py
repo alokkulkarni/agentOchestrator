@@ -130,7 +130,7 @@ async def main():
     print("="*70)
 
     # Gateway URL
-    gateway_url = os.getenv("GATEWAY_URL", "http://localhost:8000")
+    gateway_url = os.getenv("GATEWAY_URL", "http://localhost:8585")
     print(f"\nGateway URL: {gateway_url}")
 
     # Check if gateway is running

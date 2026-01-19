@@ -11,7 +11,7 @@ orchestrator:
   # Model Gateway Configuration
   gateway:
     # Gateway base URL
-    url: "http://localhost:8000"
+    url: "http://localhost:8585"
 
     # Provider to use through gateway (anthropic, bedrock, or null for gateway default)
     provider: "anthropic"

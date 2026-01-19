@@ -197,7 +197,7 @@ class BedrockConfig(BaseModel):
 
 class GatewayConfig(BaseModel):
     """Model Gateway configuration for AI reasoning."""
-    url: str = Field("http://localhost:8000", description="Gateway base URL")
+    url: str = Field("http://localhost:8585", description="Gateway base URL")
     provider: Optional[str] = Field(None, description="Provider to use through gateway (anthropic, bedrock)")
     model: Optional[str] = Field(None, description="Model to use (or None for provider default)")
     api_key: Optional[str] = Field(None, description="Optional API key for gateway authentication")

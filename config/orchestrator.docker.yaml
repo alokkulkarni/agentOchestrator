@@ -1,0 +1,51 @@
+# Docker Orchestrator Configuration
+# This configuration is optimized for Docker deployment
+
+orchestrator:
+  name: "main-orchestrator"
+  reasoning_mode: "hybrid"
+
+  # Use Model Gateway (default for Docker)
+  ai_provider: "gateway"
+
+  # Model Gateway Configuration (Docker internal networking)
+  gateway:
+    url: "http://model-gateway:8585"
+    provider: "anthropic"
+    model: null
+    api_key: null
+
+    # Retry Configuration
+    max_retries: 3
+    timeout: 60
+    retry_delay: 1.0
+
+  max_parallel_agents: 3
+  default_timeout: 30
+
+# Retry and fallback configuration
+retry_config:
+  max_attempts: 3
+  exponential_backoff: true
+  base_delay: 1.0
+  max_delay: 30.0
+  retry_on_timeout: true
+
+# Fallback configuration
+fallback_agents: {}
+
+# Agent configuration file path
+agents_config_path: "config/agents.yaml"
+
+# Routing rules configuration file path
+rules_config_path: "config/rules.yaml"
+
+# JSON schemas directory path
+schemas_path: "config/schemas"
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "json"
+  handlers:
+    - console

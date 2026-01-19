@@ -137,6 +137,7 @@ pythonenv*/
 # ============================================================================
 # Environment Variables & Secrets
 # ============================================================================
+# Main .env files
 .env
 .env.local
 .env.*.local
@@ -144,6 +145,15 @@ pythonenv*/
 .env.production
 .env.test
 *.env
+
+# Project-specific .env files (with actual secrets)
+model_gateway/.env
+docker/.env
+
+# Keep .env.example and .env.docker (templates without secrets)
+!.env.example
+!.env.docker
+!model_gateway/.env.example
 
 # API Keys and secrets (extra safety)
 *secret*

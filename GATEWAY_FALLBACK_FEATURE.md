@@ -12,7 +12,7 @@ When you specify a provider in your request:
 
 ```yaml
 gateway:
-  url: "http://localhost:8000"
+  url: "http://localhost:8585"
   provider: "anthropic"  # Request Anthropic
 ```
 
@@ -267,7 +267,7 @@ python3 test_gateway_fallback.py
 
 ```bash
 # Request with Anthropic (will fallback to Bedrock if Anthropic fails)
-curl -X POST http://localhost:8000/v1/generate \
+curl -X POST http://localhost:8585/v1/generate \
   -H "Content-Type: application/json" \
   -d '{
     "messages": [{"role": "user", "content": "What is 25 + 75?"}],

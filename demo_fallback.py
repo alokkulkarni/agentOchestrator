@@ -15,7 +15,7 @@ async def demonstrate_fallback():
     print("Gateway Fallback Demonstration")
     print("="*70)
 
-    gateway_url = "http://localhost:8000"
+    gateway_url = "http://localhost:8585"
 
     # Make a request requesting Anthropic
     request_data = {

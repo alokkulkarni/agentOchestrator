@@ -538,3 +538,34 @@ Respond in JSON format:
             "mode": mode,
             "reasoning": reasoning,
         }
+
+    def get_stats(self) -> Dict[str, Any]:
+        """
+        Get gateway reasoner statistics.
+
+        Returns:
+            Dictionary with statistics including retry stats
+        """
+        stats = {
+            "gateway_url": self.gateway_url,
+            "provider": self.provider or "default",
+            "model": self.model or "default",
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+            "max_retries": self.max_retries,
+            "timeout": self.timeout,
+            "retry_delay": self.retry_delay,
+            "total_requests": self.total_requests,
+            "total_failures": self.total_failures,
+            "consecutive_failures": self.consecutive_failures,
+        }
+
+        # Add success rate if there have been requests
+        if self.total_requests > 0:
+            stats["success_rate"] = (
+                (self.total_requests - self.total_failures) / self.total_requests
+            )
+        else:
+            stats["success_rate"] = 0.0
+
+        return stats
