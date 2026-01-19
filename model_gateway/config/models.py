@@ -106,6 +106,65 @@ class FallbackConfig(BaseModel):
     )
 
 
+class ObservabilityConfig(BaseModel):
+    """Observability and monitoring configuration."""
+
+    # Tracing
+    tracing_enabled: bool = Field(
+        default=True, description="Enable distributed tracing"
+    )
+    otlp_endpoint: Optional[str] = Field(
+        default=None, description="OpenTelemetry OTLP collector endpoint"
+    )
+    otlp_insecure: bool = Field(
+        default=True, description="Use insecure connection for OTLP"
+    )
+
+    # Metrics
+    metrics_enabled: bool = Field(
+        default=True, description="Enable Prometheus metrics"
+    )
+    metrics_endpoint: str = Field(
+        default="/metrics", description="Metrics endpoint path"
+    )
+
+    # Logging
+    log_format: str = Field(
+        default="json", description="Log format (json or text)"
+    )
+    log_file: Optional[str] = Field(
+        default=None, description="Log file path (None = console only)"
+    )
+    log_rotation_enabled: bool = Field(
+        default=True, description="Enable log rotation"
+    )
+    log_max_bytes: int = Field(
+        default=10485760, description="Max log file size in bytes (10MB default)"
+    )
+    log_backup_count: int = Field(
+        default=5, description="Number of backup log files to keep"
+    )
+    sanitize_logs: bool = Field(
+        default=True, description="Enable PII sanitization in logs"
+    )
+
+    # Session tracking
+    session_tracking_enabled: bool = Field(
+        default=True, description="Enable session tracking"
+    )
+    correlation_id_header: str = Field(
+        default="X-Correlation-ID", description="Correlation ID header name"
+    )
+    session_id_header: str = Field(
+        default="X-Session-ID", description="Session ID header name"
+    )
+
+    # Cost tracking
+    cost_tracking_enabled: bool = Field(
+        default=True, description="Enable cost tracking"
+    )
+
+
 class GatewayConfig(BaseModel):
     """Complete gateway configuration."""
 
@@ -120,4 +179,8 @@ class GatewayConfig(BaseModel):
     )
     fallback: FallbackConfig = Field(
         default_factory=FallbackConfig, description="Provider fallback configuration"
+    )
+    observability: ObservabilityConfig = Field(
+        default_factory=ObservabilityConfig,
+        description="Observability configuration"
     )
