@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Interactive Agent Orchestrator Testing Script
+Interactive Agent Orchestrator API Testing Script
 
-This script allows you to test the orchestrator in real-time by:
+This script allows you to test the orchestrator API in real-time by:
 - Accepting user messages/queries
-- Processing them through the orchestrator
-- Displaying results in a readable format
+- Sending them to the orchestrator API
+- Displaying streaming responses in real-time
 - Showing execution metadata (agents used, timing, reasoning)
 
 Commands:
@@ -21,13 +21,17 @@ import os
 import sys
 from datetime import datetime
 from typing import Any, Dict, Optional
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from dotenv import load_dotenv
 
-from agent_orchestrator import Orchestrator
-
 # Load environment variables
 load_dotenv()
+
+# API Configuration
+API_BASE_URL = os.getenv("ORCHESTRATOR_API_URL", "http://localhost:8001")
 
 # ANSI color codes for terminal output
 class Colors:
@@ -42,10 +46,25 @@ class Colors:
     UNDERLINE = '\033[4m'
 
 
+def create_session() -> requests.Session:
+    """Create a requests session with retry logic."""
+    session = requests.Session()
+    retry = Retry(
+        total=3,
+        backoff_factor=0.5,
+        status_forcelist=[500, 502, 503, 504],
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
+
+
 def print_banner():
     """Print the interactive session banner."""
     print("\n" + "=" * 70)
-    print(f"{Colors.BOLD}{Colors.OKBLUE}Agent Orchestrator - Interactive Testing{Colors.ENDC}")
+    print(f"{Colors.BOLD}{Colors.OKBLUE}Agent Orchestrator API - Interactive Testing{Colors.ENDC}")
+    print(f"{Colors.OKCYAN}API Endpoint: {API_BASE_URL}{Colors.ENDC}")
     print("=" * 70)
     print("\nType your query or use commands:")
     print(f"  {Colors.OKCYAN}/help{Colors.ENDC}             - Show all available commands")
@@ -57,6 +76,7 @@ def print_banner():
     print(f"  {Colors.OKCYAN}/multi-sequential{Colors.ENDC} - Test sequential agent execution")
     print(f"\n{Colors.BOLD}Other Commands:{Colors.ENDC}")
     print(f"  {Colors.OKCYAN}/stats{Colors.ENDC}            - Show orchestrator statistics")
+    print(f"  {Colors.OKCYAN}/health{Colors.ENDC}           - Check API health")
     print(f"  {Colors.OKCYAN}/quit{Colors.ENDC}             - Exit the session")
     print("\n" + "=" * 70 + "\n")
 
@@ -74,6 +94,8 @@ def print_help():
     print("    Show example queries you can try")
     print(f"  {Colors.OKCYAN}/stats{Colors.ENDC}")
     print("    Show current orchestrator statistics")
+    print(f"  {Colors.OKCYAN}/health{Colors.ENDC}")
+    print("    Check API health status")
     print(f"  {Colors.OKCYAN}/quit{Colors.ENDC}")
     print("    Exit the interactive session")
 
@@ -196,44 +218,88 @@ def print_examples():
     print("\n" + "─" * 70 + "\n")
 
 
-def print_stats(orchestrator: Orchestrator):
+def check_health(session: requests.Session):
+    """Check API health status."""
+    try:
+        response = session.get(f"{API_BASE_URL}/health", timeout=5)
+        response.raise_for_status()
+        health_data = response.json()
+
+        print("\n" + "─" * 70)
+        print(f"{Colors.BOLD}API Health Status:{Colors.ENDC}")
+        print("─" * 70)
+
+        status = health_data.get('status', 'unknown')
+        status_color = Colors.OKGREEN if status == 'healthy' else Colors.FAIL
+        print(f"\n{status_color}Status: {status.upper()}{Colors.ENDC}")
+
+        orchestrator_info = health_data.get('orchestrator', {})
+        print(f"\n{Colors.OKGREEN}Orchestrator:{Colors.ENDC}")
+        print(f"  Name: {orchestrator_info.get('name', 'N/A')}")
+        print(f"  Initialized: {'✅' if orchestrator_info.get('initialized') else '❌'}")
+        print(f"  Request Count: {orchestrator_info.get('request_count', 0)}")
+
+        agents_info = health_data.get('agents', {})
+        print(f"\n{Colors.OKGREEN}Agents:{Colors.ENDC}")
+        print(f"  Total: {agents_info.get('total', 0)}")
+        print(f"  Healthy: {agents_info.get('healthy', 0)}")
+        print(f"  Capabilities: {', '.join(agents_info.get('capabilities', []))}")
+
+        print("\n" + "─" * 70 + "\n")
+
+    except requests.exceptions.ConnectionError:
+        print(f"\n{Colors.FAIL}❌ Cannot connect to API at {API_BASE_URL}{Colors.ENDC}")
+        print(f"{Colors.WARNING}Make sure the orchestrator API is running.{Colors.ENDC}\n")
+    except Exception as e:
+        print(f"\n{Colors.FAIL}❌ Error checking health: {e}{Colors.ENDC}\n")
+
+
+def print_stats(session: requests.Session):
     """Print orchestrator statistics."""
-    stats = orchestrator.get_stats()
+    try:
+        response = session.get(f"{API_BASE_URL}/stats", timeout=5)
+        response.raise_for_status()
+        stats = response.json()
 
-    print("\n" + "─" * 70)
-    print(f"{Colors.BOLD}Orchestrator Statistics:{Colors.ENDC}")
-    print("─" * 70)
+        print("\n" + "─" * 70)
+        print(f"{Colors.BOLD}Orchestrator Statistics:{Colors.ENDC}")
+        print("─" * 70)
 
-    print(f"\n{Colors.OKGREEN}General:{Colors.ENDC}")
-    print(f"  Orchestrator Name: {stats['name']}")
-    print(f"  Total Requests: {stats['request_count']}")
+        print(f"\n{Colors.OKGREEN}General:{Colors.ENDC}")
+        print(f"  Orchestrator Name: {stats.get('name', 'N/A')}")
+        print(f"  Total Requests: {stats.get('request_count', 0)}")
 
-    print(f"\n{Colors.OKGREEN}Agents:{Colors.ENDC}")
-    agents_info = stats.get('agents', {})
-    print(f"  Total Agents: {agents_info.get('total_agents', 0)}")
-    print(f"  Capabilities: {', '.join(agents_info.get('capabilities', []))}")
+        print(f"\n{Colors.OKGREEN}Agents:{Colors.ENDC}")
+        agents_info = stats.get('agents', {})
+        print(f"  Total Agents: {agents_info.get('total_agents', 0)}")
+        print(f"  Capabilities: {', '.join(agents_info.get('capabilities', []))}")
 
-    if agents_info.get('agents'):
-        print(f"\n  {Colors.UNDERLINE}Individual Agent Stats:{Colors.ENDC}")
-        for agent in agents_info['agents']:
-            print(f"\n    • {agent['name']}")
-            print(f"      Capabilities: {', '.join(agent.get('capabilities', []))}")
-            print(f"      Calls: {agent.get('call_count', 0)}")
-            print(f"      Success Rate: {agent.get('success_rate', 0):.1%}")
-            if agent.get('avg_execution_time'):
-                print(f"      Avg Time: {agent['avg_execution_time']:.3f}s")
-            print(f"      Healthy: {'✅' if agent.get('is_healthy') else '❌'}")
+        if agents_info.get('agents'):
+            print(f"\n  {Colors.UNDERLINE}Individual Agent Stats:{Colors.ENDC}")
+            for agent in agents_info['agents']:
+                print(f"\n    • {agent.get('name', 'N/A')}")
+                print(f"      Capabilities: {', '.join(agent.get('capabilities', []))}")
+                print(f"      Calls: {agent.get('call_count', 0)}")
+                print(f"      Success Rate: {agent.get('success_rate', 0):.1%}")
+                if agent.get('avg_execution_time'):
+                    print(f"      Avg Time: {agent['avg_execution_time']:.3f}s")
+                print(f"      Healthy: {'✅' if agent.get('is_healthy') else '❌'}")
 
-    if stats.get('reasoning'):
-        print(f"\n{Colors.OKGREEN}Reasoning:{Colors.ENDC}")
-        reasoning = stats['reasoning']
-        print(f"  Mode: {reasoning.get('mode', 'N/A')}")
-        if 'rule_matches' in reasoning:
-            print(f"  Rule Matches: {reasoning['rule_matches']}")
-        if 'ai_calls' in reasoning:
-            print(f"  AI Calls: {reasoning['ai_calls']}")
+        if stats.get('reasoning'):
+            print(f"\n{Colors.OKGREEN}Reasoning:{Colors.ENDC}")
+            reasoning = stats['reasoning']
+            print(f"  Mode: {reasoning.get('mode', 'N/A')}")
+            if 'rule_matches' in reasoning:
+                print(f"  Rule Matches: {reasoning['rule_matches']}")
+            if 'ai_calls' in reasoning:
+                print(f"  AI Calls: {reasoning['ai_calls']}")
 
-    print("\n" + "─" * 70 + "\n")
+        print("\n" + "─" * 70 + "\n")
+
+    except requests.exceptions.ConnectionError:
+        print(f"\n{Colors.FAIL}❌ Cannot connect to API at {API_BASE_URL}{Colors.ENDC}\n")
+    except Exception as e:
+        print(f"\n{Colors.FAIL}❌ Error fetching stats: {e}{Colors.ENDC}\n")
 
 
 def format_result(result: Dict[str, Any]) -> str:
@@ -247,13 +313,13 @@ def format_result(result: Dict[str, Any]) -> str:
     output.append(f"\n{status_color}{Colors.BOLD}{status_text}{Colors.ENDC}")
 
     # Agent trail
-    metadata = result.get('_metadata', {})
+    metadata = result.get('metadata', result.get('_metadata', {}))
     agent_trail = metadata.get('agent_trail', [])
     if agent_trail:
         output.append(f"\n{Colors.OKCYAN}Agents Used:{Colors.ENDC} {' → '.join(agent_trail)}")
 
     # Execution time
-    exec_time = metadata.get('total_execution_time', 0)
+    exec_time = metadata.get('total_execution_time', metadata.get('duration_seconds', 0))
     if exec_time:
         output.append(f"{Colors.OKCYAN}Execution Time:{Colors.ENDC} {exec_time:.3f}s")
 
@@ -389,15 +455,103 @@ def parse_user_input(user_input: str) -> Dict[str, Any]:
     return request
 
 
-async def interactive_session(orchestrator: Orchestrator):
-    """Run an interactive session with the orchestrator."""
+def stream_query(session: requests.Session, request_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Send a streaming query to the API and display real-time events.
+
+    Returns the final result.
+    """
+    # Always enable streaming
+    request_data['stream'] = True
+
+    try:
+        print(f"\n{Colors.OKCYAN}🌊 Streaming response...{Colors.ENDC}\n")
+
+        response = session.post(
+            f"{API_BASE_URL}/v1/query",
+            json=request_data,
+            stream=True,
+            timeout=60,
+            headers={"Accept": "text/event-stream"}
+        )
+        response.raise_for_status()
+
+        final_result = None
+        current_event = None
+
+        # Process SSE stream
+        for line in response.iter_lines():
+            if not line:
+                continue
+
+            line = line.decode('utf-8')
+
+            if line.startswith('event:'):
+                current_event = line.split(':', 1)[1].strip()
+
+            elif line.startswith('data:'):
+                data_str = line.split(':', 1)[1].strip()
+                try:
+                    data = json.loads(data_str)
+
+                    # Display event based on type
+                    if current_event == 'started':
+                        print(f"{Colors.OKBLUE}▶ Started:{Colors.ENDC} {data.get('message', 'Processing...')}")
+
+                    elif current_event == 'security_validation':
+                        print(f"{Colors.OKBLUE}🔒 Security:{Colors.ENDC} {data.get('message', 'Validating...')}")
+
+                    elif current_event == 'reasoning_started':
+                        mode = data.get('reasoning_mode', 'N/A')
+                        print(f"{Colors.OKBLUE}🧠 Reasoning:{Colors.ENDC} {data.get('message', 'Thinking...')} (mode: {mode})")
+
+                    elif current_event == 'reasoning_complete':
+                        agents = ', '.join(data.get('agents_selected', []))
+                        confidence = data.get('confidence', 0)
+                        parallel = data.get('parallel', False)
+                        exec_type = "parallel" if parallel else "sequential"
+                        print(f"{Colors.OKGREEN}✓ Agents Selected:{Colors.ENDC} {agents} (confidence: {confidence:.2f}, {exec_type})")
+
+                    elif current_event == 'agents_executing':
+                        agents = ', '.join(data.get('agents', []))
+                        print(f"{Colors.OKCYAN}⚙ Executing:{Colors.ENDC} {agents}")
+
+                    elif current_event == 'validation':
+                        print(f"{Colors.OKBLUE}✓ Validation:{Colors.ENDC} {data.get('message', 'Validating output...')}")
+
+                    elif current_event == 'completed':
+                        success = data.get('success', False)
+                        duration = data.get('duration_seconds', 0)
+                        status_symbol = "✅" if success else "❌"
+                        print(f"{Colors.OKGREEN}{status_symbol} Completed:{Colors.ENDC} {duration:.3f}s")
+                        final_result = data.get('result', {})
+
+                    elif current_event == 'error':
+                        print(f"{Colors.FAIL}❌ Error:{Colors.ENDC} {data.get('error', 'Unknown error')}")
+                        final_result = {'success': False, 'errors': [data]}
+
+                except json.JSONDecodeError:
+                    pass
+
+        return final_result or {'success': False, 'errors': [{'error': 'No result received'}]}
+
+    except requests.exceptions.ConnectionError:
+        print(f"\n{Colors.FAIL}❌ Cannot connect to API at {API_BASE_URL}{Colors.ENDC}")
+        print(f"{Colors.WARNING}Make sure the orchestrator API is running.{Colors.ENDC}\n")
+        return {'success': False, 'errors': [{'error': 'Connection failed'}]}
+
+    except Exception as e:
+        print(f"\n{Colors.FAIL}❌ Error during streaming: {e}{Colors.ENDC}\n")
+        return {'success': False, 'errors': [{'error': str(e)}]}
+
+
+def interactive_session(session: requests.Session):
+    """Run an interactive session with the orchestrator API."""
     print_banner()
 
-    # Check for API key
-    if not os.getenv("ANTHROPIC_API_KEY"):
-        print(f"{Colors.WARNING}⚠️  WARNING: ANTHROPIC_API_KEY not set.{Colors.ENDC}")
-        print("AI reasoning will be limited. Rule-based routing will be used.")
-        print("Set the environment variable in .env file for full AI capabilities.\n")
+    # Check API health on startup
+    print(f"{Colors.OKBLUE}Checking API health...{Colors.ENDC}")
+    check_health(session)
 
     request_count = 0
 
@@ -426,7 +580,11 @@ async def interactive_session(orchestrator: Orchestrator):
                     continue
 
                 elif command == '/stats' or command == '/s':
-                    print_stats(orchestrator)
+                    print_stats(session)
+                    continue
+
+                elif command == '/health':
+                    check_health(session)
                     continue
 
                 elif command == '/load-sample-data' or command == '/sample':
@@ -593,7 +751,7 @@ async def interactive_session(orchestrator: Orchestrator):
                             "filters": {"conditions": {"department": "Engineering"}}
                         }
 
-                        filter_result = await orchestrator.process(filter_request)
+                        filter_result = stream_query(session, filter_request)
                         print(format_result(filter_result))
 
                         if not filter_result['success']:
@@ -622,7 +780,7 @@ async def interactive_session(orchestrator: Orchestrator):
                             "filters": {"sort_by": "salary", "reverse": True}
                         }
 
-                        sort_result = await orchestrator.process(sort_request)
+                        sort_result = stream_query(session, sort_request)
                         print(format_result(sort_result))
 
                         print(f"\n{Colors.OKGREEN}{'='*70}{Colors.ENDC}")
@@ -681,7 +839,7 @@ async def interactive_session(orchestrator: Orchestrator):
                             print(f"\n{Colors.OKBLUE}{'='*70}{Colors.ENDC}")
                             print(f"{Colors.OKBLUE}[{idx}/4] Running: {op_name}{Colors.ENDC}")
                             print(f"{Colors.OKBLUE}{'='*70}{Colors.ENDC}")
-                            result = await orchestrator.process(op_data)
+                            result = stream_query(session, op_data)
 
                             # Display detailed formatted result
                             print(format_result(result))
@@ -714,7 +872,7 @@ async def interactive_session(orchestrator: Orchestrator):
                         print(f"\n{Colors.OKBLUE}{'='*70}{Colors.ENDC}")
                         print(f"{Colors.OKBLUE}[{idx}/5] Running: {op_name}{Colors.ENDC}")
                         print(f"{Colors.OKBLUE}{'='*70}{Colors.ENDC}")
-                        result = await orchestrator.process(op_data)
+                        result = stream_query(session, op_data)
 
                         # Display detailed formatted result
                         print(format_result(result))
@@ -743,10 +901,8 @@ async def interactive_session(orchestrator: Orchestrator):
             if len(request) > 1:
                 print(f"{Colors.OKBLUE}Parsed as:{Colors.ENDC} {json.dumps(request, indent=2)}")
 
-            # Process through orchestrator
-            start_time = datetime.now()
-            result = await orchestrator.process(request)
-            end_time = datetime.now()
+            # Process through API with streaming
+            result = stream_query(session, request)
 
             # Display result
             print(format_result(result))
@@ -774,33 +930,20 @@ async def interactive_session(orchestrator: Orchestrator):
             print(f"\n{Colors.OKCYAN}{'─' * 70}{Colors.ENDC}\n")
 
 
-async def main():
+def main():
     """Main entry point."""
-    orchestrator = None
+    # Create HTTP session
+    session = create_session()
 
     try:
-        # Initialize orchestrator
-        print(f"\n{Colors.OKBLUE}Initializing orchestrator...{Colors.ENDC}")
-        orchestrator = Orchestrator(config_path="config/orchestrator.yaml")
-        await orchestrator.initialize()
-
-        # Show initialization info
-        stats = orchestrator.get_stats()
-        agent_count = stats['agents']['total_agents']
-        capabilities = stats['agents']['capabilities']
-
-        print(f"{Colors.OKGREEN}✅ Orchestrator initialized successfully!{Colors.ENDC}")
-        print(f"   Agents: {agent_count}")
-        print(f"   Capabilities: {', '.join(capabilities)}")
-
         # Run interactive session
-        await interactive_session(orchestrator)
+        interactive_session(session)
 
     except KeyboardInterrupt:
         print(f"\n\n{Colors.WARNING}Interrupted by user.{Colors.ENDC}\n")
 
     except Exception as e:
-        print(f"\n{Colors.FAIL}❌ Error initializing orchestrator:{Colors.ENDC}")
+        print(f"\n{Colors.FAIL}❌ Error:{Colors.ENDC}")
         print(f"{Colors.FAIL}{str(e)}{Colors.ENDC}")
 
         import traceback
@@ -808,16 +951,12 @@ async def main():
         sys.exit(1)
 
     finally:
-        # Cleanup
-        if orchestrator:
-            print(f"{Colors.OKBLUE}Cleaning up orchestrator...{Colors.ENDC}")
-            await orchestrator.cleanup()
-            print(f"{Colors.OKGREEN}✅ Cleanup complete.{Colors.ENDC}\n")
+        session.close()
 
 
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        main()
     except KeyboardInterrupt:
         print(f"\n{Colors.OKGREEN}Goodbye!{Colors.ENDC}\n")
         sys.exit(0)

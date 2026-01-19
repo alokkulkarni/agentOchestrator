@@ -18,12 +18,20 @@ scrape_configs:
     scrape_interval: 10s  # Scrape every 10 seconds
     scrape_timeout: 5s
 
-  # Orchestrator metrics
-  - job_name: 'orchestrator'
+  # Orchestrator API metrics
+  - job_name: 'orchestrator-api'
     static_configs:
-      - targets: ['orchestrator:9090']  # Docker internal network
+      - targets: ['orchestrator-api:9090']  # Docker internal network
     metrics_path: '/metrics'  # Dedicated metrics server
     scrape_interval: 10s  # Scrape every 10 seconds
+    scrape_timeout: 5s
+
+  # Orchestrator API HTTP metrics (alternative endpoint)
+  - job_name: 'orchestrator-api-http'
+    static_configs:
+      - targets: ['orchestrator-api:8001']  # Docker internal network
+    metrics_path: '/metrics'  # HTTP API metrics endpoint
+    scrape_interval: 15s
     scrape_timeout: 5s
 
   # Prometheus self-monitoring
