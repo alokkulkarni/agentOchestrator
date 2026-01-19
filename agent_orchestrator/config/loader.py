@@ -137,6 +137,13 @@ def load_orchestrator_config(file_path: str | Path = "config/orchestrator.yaml")
         ConfigurationError: If loading or validation fails
     """
     config_dict = load_yaml_file(file_path)
+
+    # Handle nested orchestrator section - merge it into top level
+    if "orchestrator" in config_dict:
+        orchestrator_section = config_dict.pop("orchestrator")
+        # Merge orchestrator section into top level (orchestrator fields take precedence)
+        config_dict = {**config_dict, **orchestrator_section}
+
     return validate_config(config_dict, OrchestratorConfig)
 
 

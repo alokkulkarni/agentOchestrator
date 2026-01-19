@@ -195,15 +195,23 @@ class BedrockConfig(BaseModel):
     aws_profile: Optional[str] = Field(None, description="AWS profile name to use")
 
 
+class GatewayConfig(BaseModel):
+    """Model Gateway configuration for AI reasoning."""
+    url: str = Field("http://localhost:8000", description="Gateway base URL")
+    provider: Optional[str] = Field(None, description="Provider to use through gateway (anthropic, bedrock)")
+    model: Optional[str] = Field(None, description="Model to use (or None for provider default)")
+    api_key: Optional[str] = Field(None, description="Optional API key for gateway authentication")
+
+
 class OrchestratorConfig(BaseModel):
     """Main orchestrator configuration."""
     name: str = Field("agent-orchestrator", description="Orchestrator instance name")
     reasoning_mode: ReasoningMode = Field(ReasoningMode.HYBRID, description="Reasoning strategy")
 
     # AI Provider selection
-    ai_provider: Literal["anthropic", "bedrock"] = Field(
+    ai_provider: Literal["anthropic", "bedrock", "gateway"] = Field(
         "anthropic",
-        description="AI provider for reasoning (anthropic or bedrock)"
+        description="AI provider for reasoning (anthropic, bedrock, or gateway)"
     )
 
     # Anthropic configuration
@@ -216,6 +224,12 @@ class OrchestratorConfig(BaseModel):
     bedrock: Optional[BedrockConfig] = Field(
         None,
         description="AWS Bedrock configuration (when using Bedrock)"
+    )
+
+    # Gateway configuration
+    gateway: Optional[GatewayConfig] = Field(
+        None,
+        description="Model Gateway configuration (when using Gateway)"
     )
     max_parallel_agents: int = Field(
         3, ge=1, le=10,

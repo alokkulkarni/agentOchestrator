@@ -11,10 +11,9 @@ orchestrator:
   # - hybrid: Tries rules first, falls back to AI (recommended)
   reasoning_mode: "hybrid"
 
-  # AI Provider: "anthropic", "bedrock", or "gateway"
+  # AI Provider: "anthropic" or "bedrock"
   # - anthropic: Uses Anthropic's Claude API directly (requires ANTHROPIC_API_KEY)
   # - bedrock: Uses AWS Bedrock with Claude models (requires AWS credentials)
-  # - gateway: Uses Model Gateway for unified access (requires gateway URL)
   ai_provider: "anthropic"
 
   # Anthropic Configuration (used when ai_provider is "anthropic")
@@ -42,22 +41,6 @@ orchestrator:
   #   # Optional: AWS profile name to use from ~/.aws/credentials
   #   # Leave null to use default credentials chain
   #   aws_profile: null
-
-  # Model Gateway Configuration (used when ai_provider is "gateway")
-  # Uncomment and configure when using the Model Gateway
-  # gateway:
-  #   # Gateway base URL
-  #   url: "http://localhost:8000"
-  #
-  #   # Provider to use through gateway (anthropic, bedrock, or null for gateway default)
-  #   provider: null
-  #
-  #   # Model to use (or null for provider default)
-  #   model: null
-  #
-  #   # Optional: API key for gateway authentication
-  #   # Leave null if gateway doesn't require authentication
-  #   api_key: null
 
   # Maximum number of agents that can be called in parallel
   max_parallel_agents: 3

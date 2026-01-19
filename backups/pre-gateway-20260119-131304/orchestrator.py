@@ -24,7 +24,7 @@ from .config import (
     load_all_configs,
     OrchestratorConfig,
 )
-from .reasoning import AIReasoner, BedrockReasoner, GatewayReasoner, HybridReasoner, RuleEngine
+from .reasoning import AIReasoner, BedrockReasoner, HybridReasoner, RuleEngine
 from .utils import (
     CircuitBreaker,
     FallbackStrategy,
@@ -117,29 +117,9 @@ class Orchestrator:
                     f"Initialized Bedrock AI reasoner with model: {self.config.bedrock.model_id}, "
                     f"region: {self.config.bedrock.region}"
                 )
-
-            elif self.config.ai_provider == "gateway":
-                # Model Gateway provider
-                if not self.config.gateway:
-                    raise ConfigurationError(
-                        "Gateway configuration required when ai_provider is 'gateway'"
-                    )
-
-                self.ai_reasoner = GatewayReasoner(
-                    gateway_url=self.config.gateway.url,
-                    provider=self.config.gateway.provider,
-                    model=self.config.gateway.model,
-                    api_key=self.config.gateway.api_key,
-                )
-                logger.info(
-                    f"Initialized Gateway AI reasoner: url={self.config.gateway.url}, "
-                    f"provider={self.config.gateway.provider or 'default'}, "
-                    f"model={self.config.gateway.model or 'default'}"
-                )
-
             else:
                 raise ConfigurationError(
-                    f"Invalid ai_provider: {self.config.ai_provider}. Must be 'anthropic', 'bedrock', or 'gateway'"
+                    f"Invalid ai_provider: {self.config.ai_provider}. Must be 'anthropic' or 'bedrock'"
                 )
 
         self.hybrid_reasoner = None

@@ -1,0 +1,51 @@
+# Model Gateway Configuration
+
+# Default provider to use when not specified in request
+default_provider: "anthropic"
+
+# Automatic Provider Fallback Configuration
+fallback:
+  # Enable automatic fallback between providers
+  enabled: true
+
+  # Order of providers to try on failure (will try in this order)
+  fallback_order:
+    - "anthropic"
+    - "bedrock"
+
+  # Maximum number of fallback attempts (set to number of providers)
+  max_fallback_attempts: 2
+
+  # Retry original provider after successful fallback (usually not needed)
+  retry_original: false
+
+# Provider configurations
+providers:
+  # Anthropic Claude API
+  anthropic:
+    type: "anthropic"
+    enabled: true
+    default_model: "claude-sonnet-4-5-20250929"
+    # API key loaded from GATEWAY_ANTHROPIC_API_KEY env var
+    timeout: 60
+    max_retries: 3
+
+  # AWS Bedrock
+  bedrock:
+    type: "bedrock"
+    enabled: true
+    region: "us-east-1"  # Override with GATEWAY_AWS_REGION
+    model_id: "anthropic.claude-sonnet-3-5-v2-20241022"
+    # Optional: AWS profile (override with GATEWAY_AWS_PROFILE)
+    aws_profile: null
+    # Optional: IAM role ARN for cross-account access
+    role_arn: null
+    session_name: "model-gateway"
+    timeout: 60
+    max_retries: 3
+
+# Rate limiting (optional)
+rate_limit:
+  enabled: false
+  requests_per_minute: 60
+  tokens_per_minute: 100000

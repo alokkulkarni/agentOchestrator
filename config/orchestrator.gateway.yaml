@@ -1,0 +1,65 @@
+# Orchestrator Configuration with Model Gateway
+# This configuration uses the Model Gateway for AI reasoning
+
+orchestrator:
+  name: "main-orchestrator"
+  reasoning_mode: "hybrid"
+
+  # Use Model Gateway for AI provider
+  ai_provider: "gateway"
+
+  # Model Gateway Configuration
+  gateway:
+    # Gateway base URL
+    url: "http://localhost:8000"
+
+    # Provider to use through gateway (anthropic, bedrock, or null for gateway default)
+    provider: "anthropic"
+
+    # Model to use (or null for provider default)
+    model: null
+
+    # Optional: API key for gateway authentication
+    api_key: null
+
+  # Maximum number of agents that can be called in parallel
+  max_parallel_agents: 3
+
+  # Default timeout for agent calls (seconds)
+  default_timeout: 30
+
+# Retry and fallback configuration
+retry_config:
+  max_attempts: 3
+  exponential_backoff: true
+  base_delay: 1.0
+  max_delay: 30.0
+  retry_on_timeout: true
+  retry_on_connection_error: true
+
+# Output validation configuration
+validation:
+  schema_name: null
+  required_fields: []
+  strict: false
+
+# Paths to other configuration files (relative to this file)
+agents_config_path: "agents.yaml"
+rules_config_path: "rules.yaml"
+schemas_path: "schemas/"
+
+# Logging configuration
+log_level: "INFO"
+
+# Feature flags
+enable_metrics: true
+enable_audit_log: true
+
+# Response validation and hallucination detection
+validation_confidence_threshold: 0.7
+validation_max_retries: 2
+
+# Per-query logging
+query_log_dir: "logs/queries"
+log_queries_to_file: true
+log_queries_to_console: false
