@@ -45,9 +45,10 @@ MOCK_DOCUMENTS = [
 
 
 async def search_documents(
-    query: str,
+    query: str = "",
+    keywords: List[str] = None,
     max_results: int = 10,
-    min_relevance: float = 0.0,
+    min_relevance: float = 0.1,
 ) -> Dict[str, Any]:
     """
     Search through documents and return relevant results.
@@ -55,9 +56,10 @@ async def search_documents(
     This is an async function demonstrating async agent support.
 
     Args:
-        query: Search query string
+        query: Search query string (optional if keywords provided)
+        keywords: List of keywords to search for (optional)
         max_results: Maximum number of results to return
-        min_relevance: Minimum relevance score (0.0 to 1.0)
+        min_relevance: Minimum relevance score (0.0 to 1.0), default 0.1
 
     Returns:
         Dictionary with query, results, and metadata
@@ -65,8 +67,26 @@ async def search_documents(
     # Simulate async processing
     await asyncio.sleep(0.1)
 
-    query_lower = query.lower()
-    query_terms = set(query_lower.split())
+    # Build query terms from both query string and keywords list
+    query_terms = set()
+
+    if query:
+        query_lower = query.lower()
+        query_terms.update(query_lower.split())
+
+    if keywords:
+        query_terms.update(k.lower() for k in keywords)
+
+    # If no query terms provided, return empty results
+    if not query_terms:
+        return {
+            "query": query or "",
+            "keywords": keywords or [],
+            "results": [],
+            "total_count": 0,
+            "page": 1,
+            "has_more": False,
+        }
 
     results = []
 
@@ -91,13 +111,19 @@ async def search_documents(
     # Limit results
     results = results[:max_results]
 
-    return {
-        "query": query,
+    response = {
+        "query": query or "",
         "results": results,
         "total_count": len(results),
         "page": 1,
         "has_more": False,
     }
+
+    # Include keywords in response if provided
+    if keywords:
+        response["keywords"] = keywords
+
+    return response
 
 
 def _calculate_relevance(doc: Dict[str, Any], query_terms: set) -> float:

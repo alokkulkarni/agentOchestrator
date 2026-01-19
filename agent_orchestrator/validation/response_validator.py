@@ -202,11 +202,11 @@ class ResponseValidator:
                         issues.append(f"{agent_name}: Missing 'results' field")
 
                 elif agent_name == "data_processor":
-                    if not any(
-                        key in response_data
-                        for key in ["processed_data", "filtered_results", "aggregations"]
-                    ):
-                        issues.append(f"{agent_name}: Missing expected data fields")
+                    # Check for required fields per data_processor_output.json schema
+                    required_fields = ["operation", "input_count", "output_count", "result"]
+                    missing_fields = [f for f in required_fields if f not in response_data]
+                    if missing_fields:
+                        issues.append(f"{agent_name}: Missing required fields: {', '.join(missing_fields)}")
 
         is_valid = len(issues) == 0
         return is_valid, issues

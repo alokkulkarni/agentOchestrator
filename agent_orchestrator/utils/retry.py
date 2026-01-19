@@ -254,27 +254,35 @@ class RetryHandler:
         timeout: Optional[int] = None,
         fallback_map: Optional[Dict[str, str]] = None,
         parallel: bool = False,
+        per_agent_input: Optional[Dict[str, Dict[str, Any]]] = None,
     ) -> List[AgentResponse]:
         """
         Call multiple agents with retry logic.
 
         Args:
             agents: List of agents to call
-            input_data: Input data for agents
+            input_data: Base input data for agents (used if per_agent_input not provided)
             timeout: Optional timeout override
             fallback_map: Map of agent names to fallback agent names
             parallel: Whether to call agents in parallel
+            per_agent_input: Optional dict mapping agent names to their specific input data
 
         Returns:
             List of agent responses
         """
         fallback_map = fallback_map or {}
 
+        # Helper to get input data for a specific agent
+        def get_agent_input(agent_name: str) -> Dict[str, Any]:
+            if per_agent_input and agent_name in per_agent_input:
+                return per_agent_input[agent_name]
+            return input_data
+
         if parallel:
             logger.debug(f"Calling {len(agents)} agents in parallel with retry")
             tasks = [
                 self.call_with_retry(
-                    agent, input_data, timeout,
+                    agent, get_agent_input(agent.name), timeout,
                     fallback_map.get(agent.name)
                 )
                 for agent in agents
@@ -286,7 +294,7 @@ class RetryHandler:
             responses = []
             for agent in agents:
                 response = await self.call_with_retry(
-                    agent, input_data, timeout,
+                    agent, get_agent_input(agent.name), timeout,
                     fallback_map.get(agent.name)
                 )
                 responses.append(response)

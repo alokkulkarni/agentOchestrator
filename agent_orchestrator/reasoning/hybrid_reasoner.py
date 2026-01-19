@@ -264,32 +264,114 @@ class HybridReasoner:
 
                     logger.info(
                         f"Multiple rules matched with high confidence (avg={avg_confidence:.2f}), "
-                        f"combining agents: {rule_names}"
+                        f"validating with AI: {rule_names}"
                     )
 
-                    return ReasoningResult(
-                        agents=all_agents,
-                        confidence=avg_confidence,
-                        method="rule_multi",
-                        reasoning=f"Multiple rules matched: {', '.join(rule_names)}. Combined agents for multi-intent query.",
-                        parallel=True,  # Multiple intents can be processed in parallel
-                        rule_matches=rule_matches,
+                    # Validate multi-agent selection with AI
+                    validation = await self.ai_reasoner.validate_rule_selection(
+                        input_data=input_data,
+                        rule_selected_agents=all_agents,
+                        available_agents=available_agents,
+                        rule_name=f"multiple: {', '.join(rule_names)}",
                     )
+
+                    if validation["is_valid"]:
+                        # AI validated the multi-agent selection
+                        logger.info(
+                            f"AI validated multi-agent selection (confidence={validation['confidence']:.2f})"
+                        )
+                        return ReasoningResult(
+                            agents=all_agents,
+                            confidence=avg_confidence,
+                            method="rule_multi_validated",
+                            reasoning=f"Multiple rules validated by AI: {', '.join(rule_names)}. {validation['reasoning']}",
+                            parallel=True,  # Multiple intents can be processed in parallel
+                            parameters=validation.get("parameters", {}),
+                            rule_matches=rule_matches,
+                        )
+                    else:
+                        # AI rejected multi-agent selection
+                        logger.warning(
+                            f"AI rejected multi-agent selection: {validation['reasoning']}"
+                        )
+
+                        suggested_agents = validation.get("suggested_agents", [])
+                        if suggested_agents:
+                            # Filter to only include available agents
+                            available_names = {agent.name for agent in available_agents}
+                            valid_suggested = [a for a in suggested_agents if a in available_names]
+
+                            if valid_suggested:
+                                logger.info(f"Using AI-suggested agents instead: {valid_suggested}")
+                                return ReasoningResult(
+                                    agents=valid_suggested,
+                                    confidence=validation["confidence"],
+                                    method="ai_override",
+                                    reasoning=f"AI override of multi-rule: {validation['reasoning']}",
+                                    parallel=False,
+                                    rule_matches=rule_matches,
+                                )
+
+                        # No valid suggestions, fall back to full AI reasoning
+                        logger.info("No valid AI suggestions for multi-agent, falling back to full AI reasoning")
+                        # Continue to Step 2 below
                 else:
-                    # Single high-confidence match
+                    # Single high-confidence match - validate with AI before using
                     best_match = high_confidence_matches[0]
                     logger.info(
                         f"Rule engine matched with high confidence ({best_match.confidence:.2f}), "
-                        f"skipping AI"
+                        f"validating with AI"
                     )
-                    return ReasoningResult(
-                        agents=best_match.target_agents,
-                        confidence=best_match.confidence,
-                        method="rule",
-                        reasoning=f"Rule '{best_match.rule_name}' matched with high confidence: {', '.join(best_match.matched_conditions)}",
-                        parallel=False,
-                        rule_matches=rule_matches,
+
+                    # Validate rule selection with AI
+                    validation = await self.ai_reasoner.validate_rule_selection(
+                        input_data=input_data,
+                        rule_selected_agents=best_match.target_agents,
+                        available_agents=available_agents,
+                        rule_name=best_match.rule_name,
                     )
+
+                    if validation["is_valid"]:
+                        # AI validated the rule selection
+                        logger.info(
+                            f"AI validated rule selection (confidence={validation['confidence']:.2f}): "
+                            f"{validation['reasoning']}"
+                        )
+                        return ReasoningResult(
+                            agents=best_match.target_agents,
+                            confidence=best_match.confidence,
+                            method="rule_validated",
+                            reasoning=f"Rule '{best_match.rule_name}' validated by AI: {validation['reasoning']}",
+                            parallel=False,
+                            rule_matches=rule_matches,
+                        )
+                    else:
+                        # AI rejected rule selection, use AI's suggested agents
+                        logger.warning(
+                            f"AI rejected rule selection (confidence={validation['confidence']:.2f}): "
+                            f"{validation['reasoning']}"
+                        )
+
+                        suggested_agents = validation.get("suggested_agents", [])
+                        if suggested_agents:
+                            # Filter to only include available agents
+                            available_names = {agent.name for agent in available_agents}
+                            valid_suggested = [a for a in suggested_agents if a in available_names]
+
+                            if valid_suggested:
+                                logger.info(f"Using AI-suggested agents instead: {valid_suggested}")
+                                return ReasoningResult(
+                                    agents=valid_suggested,
+                                    confidence=validation["confidence"],
+                                    method="ai_override",
+                                    reasoning=f"AI override: {validation['reasoning']}",
+                                    parallel=False,
+                                    rule_matches=rule_matches,
+                                )
+
+                        # No valid suggested agents, fall back to full AI reasoning
+                        logger.info("No valid AI suggestions, falling back to full AI reasoning")
+                        # Continue to Step 2 below
             else:
                 # No high-confidence matches
                 best_match = rule_matches[0]

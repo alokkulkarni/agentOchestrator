@@ -196,6 +196,11 @@ class BaseAgent(ABC):
             if self._call_count > 0
             else 0.0
         )
+        success_rate = (
+            (self._call_count - self._error_count) / self._call_count
+            if self._call_count > 0
+            else 0.0
+        )
 
         return {
             "name": self.name,
@@ -203,6 +208,7 @@ class BaseAgent(ABC):
             "is_healthy": self._is_healthy,
             "call_count": self._call_count,
             "error_count": self._error_count,
+            "success_rate": success_rate,
             "error_rate": error_rate,
             "avg_execution_time": avg_time,
             "total_execution_time": self._total_execution_time,

@@ -48,10 +48,16 @@ def print_banner():
     print(f"{Colors.BOLD}{Colors.OKBLUE}Agent Orchestrator - Interactive Testing{Colors.ENDC}")
     print("=" * 70)
     print("\nType your query or use commands:")
-    print(f"  {Colors.OKCYAN}/help{Colors.ENDC}     - Show available commands")
-    print(f"  {Colors.OKCYAN}/examples{Colors.ENDC} - Show example queries")
-    print(f"  {Colors.OKCYAN}/stats{Colors.ENDC}    - Show orchestrator statistics")
-    print(f"  {Colors.OKCYAN}/quit{Colors.ENDC}     - Exit the session")
+    print(f"  {Colors.OKCYAN}/help{Colors.ENDC}             - Show all available commands")
+    print(f"  {Colors.OKCYAN}/examples{Colors.ENDC}         - Show example queries")
+    print(f"\n{Colors.BOLD}Quick Test Commands:{Colors.ENDC}")
+    print(f"  {Colors.OKCYAN}/test-all-dp{Colors.ENDC}      - Test all data processor operations")
+    print(f"  {Colors.OKCYAN}/test-all-calc{Colors.ENDC}    - Test all calculator operations")
+    print(f"  {Colors.OKCYAN}/multi-parallel{Colors.ENDC}   - Test parallel agent execution")
+    print(f"  {Colors.OKCYAN}/multi-sequential{Colors.ENDC} - Test sequential agent execution")
+    print(f"\n{Colors.BOLD}Other Commands:{Colors.ENDC}")
+    print(f"  {Colors.OKCYAN}/stats{Colors.ENDC}            - Show orchestrator statistics")
+    print(f"  {Colors.OKCYAN}/quit{Colors.ENDC}             - Exit the session")
     print("\n" + "=" * 70 + "\n")
 
 
@@ -60,14 +66,51 @@ def print_help():
     print("\n" + "─" * 70)
     print(f"{Colors.BOLD}Available Commands:{Colors.ENDC}")
     print("─" * 70)
-    print(f"\n  {Colors.OKCYAN}/help{Colors.ENDC}")
+
+    print(f"\n{Colors.BOLD}General Commands:{Colors.ENDC}")
+    print(f"  {Colors.OKCYAN}/help{Colors.ENDC}")
     print("    Show this help message")
-    print(f"\n  {Colors.OKCYAN}/examples{Colors.ENDC}")
+    print(f"  {Colors.OKCYAN}/examples{Colors.ENDC}")
     print("    Show example queries you can try")
-    print(f"\n  {Colors.OKCYAN}/stats{Colors.ENDC}")
+    print(f"  {Colors.OKCYAN}/stats{Colors.ENDC}")
     print("    Show current orchestrator statistics")
-    print(f"\n  {Colors.OKCYAN}/quit{Colors.ENDC}")
+    print(f"  {Colors.OKCYAN}/quit{Colors.ENDC}")
     print("    Exit the interactive session")
+
+    print(f"\n{Colors.BOLD}Data Processor Commands:{Colors.ENDC}")
+    print(f"  {Colors.OKCYAN}/load-sample-data{Colors.ENDC} (or /sample)")
+    print("    Show data processor quick commands and sample data")
+    print(f"  {Colors.OKCYAN}/dp-aggregate{Colors.ENDC}")
+    print("    Run aggregate operation (count, avg, min, max, sum)")
+    print(f"  {Colors.OKCYAN}/dp-filter{Colors.ENDC}")
+    print("    Run filter operation (Engineering dept only)")
+    print(f"  {Colors.OKCYAN}/dp-sort{Colors.ENDC}")
+    print("    Run sort operation (by salary, descending)")
+    print(f"  {Colors.OKCYAN}/dp-transform{Colors.ENDC}")
+    print("    Run transform operation (select specific fields)")
+    print(f"  {Colors.OKCYAN}/test-all-dp{Colors.ENDC}")
+    print("    Run all 4 data processor operations sequentially")
+
+    print(f"\n{Colors.BOLD}Calculator Commands:{Colors.ENDC}")
+    print(f"  {Colors.OKCYAN}/calc-add{Colors.ENDC}")
+    print("    Calculate 15 + 27")
+    print(f"  {Colors.OKCYAN}/calc-multiply{Colors.ENDC}")
+    print("    Calculate 8 × 12")
+    print(f"  {Colors.OKCYAN}/calc-average{Colors.ENDC}")
+    print("    Calculate average of [10, 20, 30, 40, 50]")
+    print(f"  {Colors.OKCYAN}/test-all-calc{Colors.ENDC}")
+    print("    Run all 5 calculator operations sequentially")
+
+    print(f"\n{Colors.BOLD}Search Commands:{Colors.ENDC}")
+    print(f"  {Colors.OKCYAN}/search-test{Colors.ENDC}")
+    print("    Search for 'Python tutorials'")
+
+    print(f"\n{Colors.BOLD}Multi-Agent Workflows:{Colors.ENDC}")
+    print(f"  {Colors.OKCYAN}/multi-parallel{Colors.ENDC}")
+    print("    Execute calculator and search agents in parallel")
+    print(f"  {Colors.OKCYAN}/multi-sequential{Colors.ENDC}")
+    print("    Execute calculator then search agents sequentially")
+
     print("\n" + "─" * 70)
     print(f"\n{Colors.BOLD}Query Format:{Colors.ENDC}")
     print("─" * 70)
@@ -90,35 +133,54 @@ def print_examples():
 
     examples = [
         {
-            "category": "Mathematics (Calculator Agent)",
+            "category": "Quick Test Commands (Easiest!)",
+            "queries": [
+                "/test-all-dp       - Test all data processor operations",
+                "/test-all-calc     - Test all calculator operations",
+                "/multi-parallel    - Test parallel multi-agent execution",
+                "/multi-sequential  - Test sequential multi-agent execution",
+            ]
+        },
+        {
+            "category": "Data Processor Commands",
+            "queries": [
+                "/dp-aggregate  - Calculate count, avg, min, max, sum",
+                "/dp-filter     - Filter Engineering department",
+                "/dp-sort       - Sort by salary (highest first)",
+                "/dp-transform  - Select name, dept, salary fields",
+            ]
+        },
+        {
+            "category": "Calculator Commands",
+            "queries": [
+                "/calc-add       - Add 15 + 27",
+                "/calc-multiply  - Multiply 8 × 12",
+                "/calc-average   - Average of [10, 20, 30, 40, 50]",
+            ]
+        },
+        {
+            "category": "Search Commands",
+            "queries": [
+                "/search-test  - Search for 'Python tutorials'",
+            ]
+        },
+        {
+            "category": "Natural Language Queries",
             "queries": [
                 "calculate 15 + 27",
                 "multiply 8 by 9",
                 "divide 100 by 4",
                 "find the average of 25, 30, 45",
-                '{"query": "calculate", "operation": "add", "operands": [15, 27]}',
-            ]
-        },
-        {
-            "category": "Search (Search Agent)",
-            "queries": [
                 "search for python tutorials",
                 "find documents about machine learning",
+            ]
+        },
+        {
+            "category": "JSON Format Queries (Advanced)",
+            "queries": [
+                '{"query": "calculate", "operation": "add", "operands": [15, 27]}',
                 '{"query": "search", "keywords": ["AI"], "max_results": 5}',
-            ]
-        },
-        {
-            "category": "Data Processing (Data Processor Agent)",
-            "queries": [
-                "process the data and calculate statistics",
-                '{"query": "process data", "data": [{"age": 25}, {"age": 30}], "operation": "aggregate"}',
-            ]
-        },
-        {
-            "category": "Multi-Agent Workflows",
-            "queries": [
-                "search for AI tutorials and calculate their average rating",
-                "find documents and process the data",
+                '{"query": "aggregate employee data", "data": [{"name": "Alice", "salary": 95000}], "operation": "aggregate"}',
             ]
         },
     ]
@@ -128,6 +190,9 @@ def print_examples():
         for query in example_group['queries']:
             print(f"   • {query}")
 
+    print("\n" + "─" * 70)
+    print(f"\n{Colors.BOLD}💡 Tip:{Colors.ENDC} Start with the quick test commands to see all features!")
+    print(f"   Try: {Colors.OKCYAN}/test-all-dp{Colors.ENDC} or {Colors.OKCYAN}/test-all-calc{Colors.ENDC}")
     print("\n" + "─" * 70 + "\n")
 
 
@@ -235,13 +300,21 @@ def format_result(result: Dict[str, Any]) -> str:
                         output.append("")  # Blank line
 
                     total = agent_data.get('total_count', agent_data.get('total_results', len(agent_data['results'])))
+
+                    # Filter out results with very low relevance (< 0.05) for display
+                    relevant_results = [r for r in agent_data['results'] if r.get('relevance', r.get('score', 0)) >= 0.05]
+
                     output.append(f"    Total Results: {total}")
-                    if agent_data['results']:
+                    if relevant_results:
                         output.append(f"    Top Results:")
-                        for i, r in enumerate(agent_data['results'][:3], 1):
+                        for i, r in enumerate(relevant_results[:3], 1):
                             title = r.get('title', 'Untitled')
                             relevance = r.get('relevance', r.get('score', 0))
                             output.append(f"      {i}. {title} (relevance: {relevance:.2f})")
+                    elif agent_data['results']:
+                        output.append(f"    Note: {total} results found but all have very low relevance (< 0.05)")
+                    else:
+                        output.append(f"    No relevant results found")
 
                 # For other dict data, show key info
                 else:
@@ -354,6 +427,303 @@ async def interactive_session(orchestrator: Orchestrator):
 
                 elif command == '/stats' or command == '/s':
                     print_stats(orchestrator)
+                    continue
+
+                elif command == '/load-sample-data' or command == '/sample':
+                    # Load sample employee data
+                    try:
+                        sample_path = 'examples/sample_data.json'
+                        if os.path.exists(sample_path):
+                            with open(sample_path, 'r') as f:
+                                sample_data = json.load(f)
+
+                            print(f"\n{Colors.OKGREEN}✅ Loaded {len(sample_data)} employee records from {sample_path}{Colors.ENDC}\n")
+                            print(f"{Colors.BOLD}Sample Data Preview:{Colors.ENDC}")
+                            print(json.dumps(sample_data[:2], indent=2))  # Show first 2 records
+
+                            print(f"\n{Colors.BOLD}Quick Commands (no copy/paste needed):{Colors.ENDC}")
+                            print(f"  {Colors.OKCYAN}/dp-aggregate{Colors.ENDC} - Calculate count, avg, min, max, sum")
+                            print(f"  {Colors.OKCYAN}/dp-filter{Colors.ENDC}    - Filter Engineering department")
+                            print(f"  {Colors.OKCYAN}/dp-sort{Colors.ENDC}      - Sort by salary (highest first)")
+                            print(f"  {Colors.OKCYAN}/dp-transform{Colors.ENDC} - Select name, department, salary fields")
+
+                            print(f"\n{Colors.WARNING}💡 Just type one of the commands above - no copy/paste needed!{Colors.ENDC}\n")
+                        else:
+                            print(f"{Colors.FAIL}❌ Sample data file not found: {sample_path}{Colors.ENDC}\n")
+                    except Exception as e:
+                        print(f"{Colors.FAIL}❌ Error loading sample data: {e}{Colors.ENDC}\n")
+                    continue
+
+                elif command == '/dp-aggregate':
+                    # Run aggregate with sample data
+                    sample_path = 'examples/sample_data.json'
+                    if os.path.exists(sample_path):
+                        with open(sample_path, 'r') as f:
+                            sample_data = json.load(f)
+
+                        print(f"\n{Colors.OKCYAN}Running: Aggregate employee data (count, avg, min, max, sum){Colors.ENDC}")
+                        user_input = json.dumps({
+                            "query": "aggregate employee data",
+                            "data": sample_data,
+                            "operation": "aggregate",
+                            "filters": {"aggregations": ["count", "avg", "min", "max", "sum"]}
+                        })
+                        # Continue to process this as a regular request
+                    else:
+                        print(f"{Colors.FAIL}❌ Sample data not found. Run /load-sample-data first.{Colors.ENDC}\n")
+                        continue
+
+                elif command == '/dp-filter':
+                    # Run filter with sample data
+                    sample_path = 'examples/sample_data.json'
+                    if os.path.exists(sample_path):
+                        with open(sample_path, 'r') as f:
+                            sample_data = json.load(f)
+
+                        print(f"\n{Colors.OKCYAN}Running: Filter Engineering department{Colors.ENDC}")
+                        user_input = json.dumps({
+                            "query": "filter engineering employees",
+                            "data": sample_data,
+                            "operation": "filter",
+                            "filters": {"conditions": {"department": "Engineering"}}
+                        })
+                    else:
+                        print(f"{Colors.FAIL}❌ Sample data not found. Run /load-sample-data first.{Colors.ENDC}\n")
+                        continue
+
+                elif command == '/dp-sort':
+                    # Run sort with sample data
+                    sample_path = 'examples/sample_data.json'
+                    if os.path.exists(sample_path):
+                        with open(sample_path, 'r') as f:
+                            sample_data = json.load(f)
+
+                        print(f"\n{Colors.OKCYAN}Running: Sort by salary (highest first){Colors.ENDC}")
+                        user_input = json.dumps({
+                            "query": "sort employees by salary",
+                            "data": sample_data,
+                            "operation": "sort",
+                            "filters": {"sort_by": "salary", "reverse": True}
+                        })
+                    else:
+                        print(f"{Colors.FAIL}❌ Sample data not found. Run /load-sample-data first.{Colors.ENDC}\n")
+                        continue
+
+                elif command == '/dp-transform':
+                    # Run transform with sample data
+                    sample_path = 'examples/sample_data.json'
+                    if os.path.exists(sample_path):
+                        with open(sample_path, 'r') as f:
+                            sample_data = json.load(f)
+
+                        print(f"\n{Colors.OKCYAN}Running: Transform (select name, department, salary){Colors.ENDC}")
+                        user_input = json.dumps({
+                            "query": "transform employee data",
+                            "data": sample_data,
+                            "operation": "transform",
+                            "filters": {"select": ["name", "department", "salary"]}
+                        })
+                    else:
+                        print(f"{Colors.FAIL}❌ Sample data not found. Run /load-sample-data first.{Colors.ENDC}\n")
+                        continue
+
+                # Calculator Agent Tests
+                elif command == '/calc-add':
+                    print(f"\n{Colors.OKCYAN}Running: Calculator - Add 15 + 27{Colors.ENDC}")
+                    user_input = json.dumps({
+                        "query": "add 15 and 27",
+                        "operation": "add",
+                        "operands": [15, 27]
+                    })
+
+                elif command == '/calc-multiply':
+                    print(f"\n{Colors.OKCYAN}Running: Calculator - Multiply 8 × 12{Colors.ENDC}")
+                    user_input = json.dumps({
+                        "query": "multiply 8 by 12",
+                        "operation": "multiply",
+                        "operands": [8, 12]
+                    })
+
+                elif command == '/calc-average':
+                    print(f"\n{Colors.OKCYAN}Running: Calculator - Average of [10, 20, 30, 40, 50]{Colors.ENDC}")
+                    user_input = json.dumps({
+                        "query": "calculate average",
+                        "operation": "average",
+                        "operands": [10, 20, 30, 40, 50]
+                    })
+
+                # Search Agent Test
+                elif command == '/search-test':
+                    print(f"\n{Colors.OKCYAN}Running: Search - Find Python tutorials{Colors.ENDC}")
+                    user_input = json.dumps({
+                        "query": "search for Python tutorials",
+                        "keywords": ["python", "tutorial"],
+                        "max_results": 5
+                    })
+
+                # Multi-Agent Parallel Execution
+                elif command == '/multi-parallel':
+                    print(f"\n{Colors.OKCYAN}Running: Multi-Agent PARALLEL - Calculator + Search{Colors.ENDC}")
+                    print(f"{Colors.WARNING}This will invoke multiple agents simultaneously{Colors.ENDC}")
+                    user_input = json.dumps({
+                        "query": "calculate 25 + 75 and search for machine learning"
+                    })
+
+                # Multi-Agent Sequential Execution
+                elif command == '/multi-sequential':
+                    sample_path = 'examples/sample_data.json'
+                    if os.path.exists(sample_path):
+                        with open(sample_path, 'r') as f:
+                            sample_data = json.load(f)
+
+                        print(f"\n{Colors.OKGREEN}Running: Multi-Agent SEQUENTIAL - Filter then Sort{Colors.ENDC}")
+                        print(f"{Colors.WARNING}This demonstrates sequential agent chaining with data flow{Colors.ENDC}\n")
+
+                        import time
+
+                        # Step 1: Filter Engineering department
+                        print(f"{Colors.OKBLUE}{'='*70}{Colors.ENDC}")
+                        print(f"{Colors.OKBLUE}Step 1: Filter Engineering Department{Colors.ENDC}")
+                        print(f"{Colors.OKBLUE}{'='*70}{Colors.ENDC}")
+
+                        filter_request = {
+                            "query": "filter engineering employees",
+                            "data": sample_data,
+                            "operation": "filter",
+                            "filters": {"conditions": {"department": "Engineering"}}
+                        }
+
+                        filter_result = await orchestrator.process(filter_request)
+                        print(format_result(filter_result))
+
+                        if not filter_result['success']:
+                            print(f"{Colors.FAIL}❌ Filter step failed, cannot proceed to sort{Colors.ENDC}\n")
+                            continue
+
+                        # Extract filtered data from step 1
+                        filtered_data = filter_result['data'].get('data_processor', {}).get('result', [])
+
+                        if not filtered_data:
+                            print(f"{Colors.FAIL}❌ No data returned from filter step{Colors.ENDC}\n")
+                            continue
+
+                        print(f"\n{Colors.OKGREEN}✓ Filter completed: {len(filtered_data)} Engineering employees{Colors.ENDC}")
+                        time.sleep(1)
+
+                        # Step 2: Sort filtered results by salary
+                        print(f"\n{Colors.OKBLUE}{'='*70}{Colors.ENDC}")
+                        print(f"{Colors.OKBLUE}Step 2: Sort Filtered Results by Salary{Colors.ENDC}")
+                        print(f"{Colors.OKBLUE}{'='*70}{Colors.ENDC}")
+
+                        sort_request = {
+                            "query": "sort employees by salary",
+                            "data": filtered_data,  # Use output from step 1
+                            "operation": "sort",
+                            "filters": {"sort_by": "salary", "reverse": True}
+                        }
+
+                        sort_result = await orchestrator.process(sort_request)
+                        print(format_result(sort_result))
+
+                        print(f"\n{Colors.OKGREEN}{'='*70}{Colors.ENDC}")
+                        print(f"{Colors.OKGREEN}✅ Sequential workflow completed!{Colors.ENDC}")
+                        print(f"{Colors.OKGREEN}Data flow: All 8 employees → Filter (4 Engineering) → Sort by salary{Colors.ENDC}")
+                        print(f"{Colors.OKGREEN}{'='*70}{Colors.ENDC}\n")
+                        continue
+                    else:
+                        print(f"{Colors.FAIL}❌ Sample data not found. Run /load-sample-data first.{Colors.ENDC}\n")
+                        continue
+
+                # Test All Data Processor Operations
+                elif command == '/test-all-dp':
+                    print(f"\n{Colors.OKGREEN}Running: ALL Data Processor Operations{Colors.ENDC}")
+                    print(f"{Colors.WARNING}This will run 4 operations sequentially:{Colors.ENDC}")
+                    print(f"  1. Transform")
+                    print(f"  2. Filter")
+                    print(f"  3. Aggregate")
+                    print(f"  4. Sort")
+                    print(f"\n{Colors.WARNING}Press Ctrl+C to cancel, or wait...{Colors.ENDC}\n")
+
+                    sample_path = 'examples/sample_data.json'
+                    if os.path.exists(sample_path):
+                        with open(sample_path, 'r') as f:
+                            sample_data = json.load(f)
+
+                        import time
+                        operations = [
+                            ("Transform", {
+                                "query": "transform employee data",
+                                "data": sample_data,
+                                "operation": "transform",
+                                "filters": {"select": ["name", "department", "salary"]}
+                            }),
+                            ("Filter", {
+                                "query": "filter engineering employees",
+                                "data": sample_data,
+                                "operation": "filter",
+                                "filters": {"conditions": {"department": "Engineering"}}
+                            }),
+                            ("Aggregate", {
+                                "query": "aggregate employee data",
+                                "data": sample_data,
+                                "operation": "aggregate",
+                                "filters": {"aggregations": ["count", "avg", "max"]}
+                            }),
+                            ("Sort", {
+                                "query": "sort employees by salary",
+                                "data": sample_data,
+                                "operation": "sort",
+                                "filters": {"sort_by": "salary", "reverse": True}
+                            })
+                        ]
+
+                        for idx, (op_name, op_data) in enumerate(operations, 1):
+                            print(f"\n{Colors.OKBLUE}{'='*70}{Colors.ENDC}")
+                            print(f"{Colors.OKBLUE}[{idx}/4] Running: {op_name}{Colors.ENDC}")
+                            print(f"{Colors.OKBLUE}{'='*70}{Colors.ENDC}")
+                            result = await orchestrator.process(op_data)
+
+                            # Display detailed formatted result
+                            print(format_result(result))
+
+                            time.sleep(0.5)  # Brief pause between operations
+
+                        print(f"\n{Colors.OKGREEN}{'='*70}{Colors.ENDC}")
+                        print(f"{Colors.OKGREEN}✅ All Data Processor operations completed!{Colors.ENDC}")
+                        print(f"{Colors.OKGREEN}{'='*70}{Colors.ENDC}\n")
+                        continue
+                    else:
+                        print(f"{Colors.FAIL}❌ Sample data not found. Run /load-sample-data first.{Colors.ENDC}\n")
+                        continue
+
+                # Test All Calculator Operations
+                elif command == '/test-all-calc':
+                    print(f"\n{Colors.OKGREEN}Running: ALL Calculator Operations{Colors.ENDC}")
+                    print(f"{Colors.WARNING}This will run 5 operations sequentially{Colors.ENDC}\n")
+
+                    import time
+                    operations = [
+                        ("Add", {"query": "add 15 and 27", "operation": "add", "operands": [15, 27]}),
+                        ("Subtract", {"query": "subtract 100 minus 35", "operation": "subtract", "operands": [100, 35]}),
+                        ("Multiply", {"query": "multiply 8 by 12", "operation": "multiply", "operands": [8, 12]}),
+                        ("Divide", {"query": "divide 144 by 12", "operation": "divide", "operands": [144, 12]}),
+                        ("Average", {"query": "calculate average", "operation": "average", "operands": [10, 20, 30, 40, 50]})
+                    ]
+
+                    for idx, (op_name, op_data) in enumerate(operations, 1):
+                        print(f"\n{Colors.OKBLUE}{'='*70}{Colors.ENDC}")
+                        print(f"{Colors.OKBLUE}[{idx}/5] Running: {op_name}{Colors.ENDC}")
+                        print(f"{Colors.OKBLUE}{'='*70}{Colors.ENDC}")
+                        result = await orchestrator.process(op_data)
+
+                        # Display detailed formatted result
+                        print(format_result(result))
+
+                        time.sleep(0.5)
+
+                    print(f"\n{Colors.OKGREEN}{'='*70}{Colors.ENDC}")
+                    print(f"{Colors.OKGREEN}✅ All Calculator operations completed!{Colors.ENDC}")
+                    print(f"{Colors.OKGREEN}{'='*70}{Colors.ENDC}\n")
                     continue
 
                 else:

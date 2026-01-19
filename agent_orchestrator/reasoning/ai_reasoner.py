@@ -265,6 +265,139 @@ Respond with ONLY the JSON object, no additional text."""
 
         return True
 
+    async def validate_rule_selection(
+        self,
+        input_data: Dict[str, Any],
+        rule_selected_agents: List[str],
+        available_agents: List[BaseAgent],
+        rule_name: str = "unknown",
+    ) -> Dict[str, Any]:
+        """
+        Validate rule-based agent selection using AI.
+
+        Asks the AI if the rule-selected agents are appropriate for the input,
+        and if not, what agents should be used instead.
+
+        Args:
+            input_data: Original input data
+            rule_selected_agents: Agents selected by rule engine
+            available_agents: List of available agents
+            rule_name: Name of the rule that matched
+
+        Returns:
+            Dictionary with validation result:
+            {
+                "is_valid": bool,
+                "confidence": float,
+                "reasoning": str,
+                "suggested_agents": List[str] (if is_valid is False)
+            }
+        """
+        try:
+            # Build context about available agents
+            agent_context = self._build_agent_context(available_agents)
+
+            # Build validation prompt
+            prompt = f"""You are an AI agent router validator. A rule-based system has selected agents to handle a user request.
+Your job is to validate if these agents are appropriate, extract parameters for each agent, or suggest better agents if needed.
+
+Available Agents:
+{agent_context}
+
+User Request:
+{json.dumps(input_data, indent=2)}
+
+Rule-Based Selection:
+- Rule: {rule_name}
+- Selected Agents: {', '.join(rule_selected_agents)}
+
+Task:
+1. Analyze if the selected agents are appropriate for this request
+2. Consider the agent capabilities and the request requirements
+3. Extract specific parameters needed for each agent from the user request
+4. If the selection is good, validate it
+5. If not appropriate, suggest which agents should be used instead
+
+Respond in JSON format:
+{{
+    "is_valid": true/false,
+    "confidence": 0.0-1.0 (how confident you are in your assessment),
+    "reasoning": "explanation of your decision",
+    "suggested_agents": ["agent1", "agent2"] (only if is_valid is false, otherwise empty list),
+    "parameters": {{"agent_name": {{"param": "value"}}}} (extract parameters for each selected agent)
+}}
+
+Important:
+- is_valid should be true if the rule selection is correct or acceptable
+- is_valid should be false only if there's a clear mismatch
+- suggested_agents should only be provided if is_valid is false
+- parameters should contain agent-specific parameters extracted from the user request
+  Example: For "calculate 25 + 75", calculator agent needs {{"operation": "add", "operands": [25, 75]}}
+  Example: For "search for machine learning", search agent needs {{"keywords": ["machine learning"]}}
+"""
+
+            # Call Claude
+            message = await self.client.messages.create(
+                model=self.model,
+                max_tokens=self.max_tokens,
+                messages=[{"role": "user", "content": prompt}],
+            )
+
+            # Parse response
+            response_text = message.content[0].text
+            logger.debug(f"AI validation response: {response_text}")
+
+            # Extract JSON from response (handle markdown code blocks)
+            try:
+                response_text = response_text.strip()
+                if response_text.startswith("```json"):
+                    response_text = response_text[7:]
+                if response_text.startswith("```"):
+                    response_text = response_text[3:]
+                if response_text.endswith("```"):
+                    response_text = response_text[:-3]
+                response_text = response_text.strip()
+
+                validation = json.loads(response_text)
+
+            except json.JSONDecodeError as e:
+                logger.warning(f"Failed to parse AI validation response as JSON: {e}")
+                logger.debug(f"Response text: {response_text}")
+                return {
+                    "is_valid": True,  # Default to accepting rule selection
+                    "confidence": 0.5,
+                    "reasoning": "AI validation parse error, defaulting to rule selection",
+                    "suggested_agents": [],
+                    "parameters": {},
+                }
+
+            # Ensure all required fields are present
+            result = {
+                "is_valid": validation.get("is_valid", True),
+                "confidence": float(validation.get("confidence", 0.5)),
+                "reasoning": validation.get("reasoning", "No reasoning provided"),
+                "suggested_agents": validation.get("suggested_agents", []),
+                "parameters": validation.get("parameters", {}),
+            }
+
+            logger.info(
+                f"AI validation: is_valid={result['is_valid']}, "
+                f"confidence={result['confidence']:.2f}"
+            )
+
+            return result
+
+        except Exception as e:
+            logger.error(f"AI validation failed: {e}", exc_info=True)
+            # On error, default to accepting rule selection
+            return {
+                "is_valid": True,
+                "confidence": 0.5,
+                "reasoning": f"AI validation error: {str(e)}",
+                "suggested_agents": [],
+                "parameters": {},
+            }
+
     def get_stats(self) -> Dict[str, Any]:
         """
         Get AI reasoner statistics.

@@ -28,18 +28,10 @@ rules:
         value: "divide"
         case_sensitive: false
       - field: "query"
-        operator: "contains"
-        value: "sum"
-        case_sensitive: false
-      - field: "query"
-        operator: "contains"
-        value: "average"
-        case_sensitive: false
-      - field: "query"
         operator: "regex"
         value: "\\d+\\s*[+\\-*/]\\s*\\d+"
         case_sensitive: false
-      - field: "operation"
+      - field: "operands"
         operator: "exists"
         value: null
         case_sensitive: false
@@ -127,10 +119,14 @@ rules:
     confidence: 0.90
     enabled: true
 
-  # Rule for data transformation queries
+  # Rule for data transformation queries (HIGH PRIORITY - checks for data field)
   - name: "data_processing"
-    priority: 80
+    priority: 105
     conditions:
+      - field: "data"
+        operator: "exists"
+        value: null
+        case_sensitive: false
       - field: "query"
         operator: "contains"
         value: "transform"
@@ -141,16 +137,28 @@ rules:
         case_sensitive: false
       - field: "query"
         operator: "contains"
-        value: "convert"
+        value: "filter"
         case_sensitive: false
-      - field: "data"
-        operator: "exists"
-        value: null
+      - field: "query"
+        operator: "contains"
+        value: "aggregate"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "group"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "employee data"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "data processor"
         case_sensitive: false
     logic: "or"
     target_agents:
       - "data_processor"
-    confidence: 0.80
+    confidence: 0.95
     enabled: true
 
   # Catch-all rule with low priority (uses multiple agents)

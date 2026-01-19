@@ -424,15 +424,19 @@ class Orchestrator:
             agent_params = parameters.get(agent_name, {})
             return {**input_data, **agent_params}
 
+        # Build per-agent input data
+        per_agent_input = {agent.name: get_agent_input(agent.name) for agent in agents}
+
         # Execute with retry handler
         if parallel:
-            # Call agents in parallel
+            # Call agents in parallel with agent-specific parameters
             responses = await self.retry_handler.call_multiple_with_retry(
                 agents=agents,
                 input_data=input_data,
                 timeout=self.config.default_timeout,
                 fallback_map=fallback_map,
                 parallel=True,
+                per_agent_input=per_agent_input,
             )
         else:
             # Call agents sequentially
