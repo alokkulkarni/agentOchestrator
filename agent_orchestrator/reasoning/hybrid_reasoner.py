@@ -239,23 +239,60 @@ class HybridReasoner:
         rule_matches = self.rule_engine.evaluate(input_data)
 
         if rule_matches:
-            best_match = rule_matches[0]
+            # Get all high-confidence matches
+            high_confidence_matches = [
+                m for m in rule_matches
+                if m.confidence >= self.rule_confidence_threshold
+            ]
 
-            # If high confidence, use rule result
-            if best_match.confidence >= self.rule_confidence_threshold:
-                logger.info(
-                    f"Rule engine matched with high confidence ({best_match.confidence:.2f}), "
-                    f"skipping AI"
-                )
-                return ReasoningResult(
-                    agents=best_match.target_agents,
-                    confidence=best_match.confidence,
-                    method="rule",
-                    reasoning=f"Rule '{best_match.rule_name}' matched with high confidence: {', '.join(best_match.matched_conditions)}",
-                    parallel=False,
-                    rule_matches=rule_matches,
-                )
+            if high_confidence_matches:
+                # Check if multiple high-confidence rules matched (multi-intent query)
+                if len(high_confidence_matches) > 1:
+                    # Combine agents from all high-confidence matches
+                    all_agents = []
+                    seen_agents = set()
+                    rule_names = []
+
+                    for match in high_confidence_matches:
+                        rule_names.append(match.rule_name)
+                        for agent in match.target_agents:
+                            if agent not in seen_agents:
+                                all_agents.append(agent)
+                                seen_agents.add(agent)
+
+                    avg_confidence = sum(m.confidence for m in high_confidence_matches) / len(high_confidence_matches)
+
+                    logger.info(
+                        f"Multiple rules matched with high confidence (avg={avg_confidence:.2f}), "
+                        f"combining agents: {rule_names}"
+                    )
+
+                    return ReasoningResult(
+                        agents=all_agents,
+                        confidence=avg_confidence,
+                        method="rule_multi",
+                        reasoning=f"Multiple rules matched: {', '.join(rule_names)}. Combined agents for multi-intent query.",
+                        parallel=True,  # Multiple intents can be processed in parallel
+                        rule_matches=rule_matches,
+                    )
+                else:
+                    # Single high-confidence match
+                    best_match = high_confidence_matches[0]
+                    logger.info(
+                        f"Rule engine matched with high confidence ({best_match.confidence:.2f}), "
+                        f"skipping AI"
+                    )
+                    return ReasoningResult(
+                        agents=best_match.target_agents,
+                        confidence=best_match.confidence,
+                        method="rule",
+                        reasoning=f"Rule '{best_match.rule_name}' matched with high confidence: {', '.join(best_match.matched_conditions)}",
+                        parallel=False,
+                        rule_matches=rule_matches,
+                    )
             else:
+                # No high-confidence matches
+                best_match = rule_matches[0]
                 logger.info(
                     f"Rule matched but confidence low ({best_match.confidence:.2f}), "
                     f"consulting AI"

@@ -1,0 +1,74 @@
+[
+  {
+    "id": "emp001",
+    "name": "Alice Johnson",
+    "department": "Engineering",
+    "role": "Senior Developer",
+    "salary": 95000,
+    "years_of_service": 5,
+    "performance_rating": 4.5
+  },
+  {
+    "id": "emp002",
+    "name": "Bob Smith",
+    "department": "Engineering",
+    "role": "Junior Developer",
+    "salary": 65000,
+    "years_of_service": 2,
+    "performance_rating": 4.0
+  },
+  {
+    "id": "emp003",
+    "name": "Charlie Davis",
+    "department": "Sales",
+    "role": "Sales Manager",
+    "salary": 85000,
+    "years_of_service": 7,
+    "performance_rating": 4.8
+  },
+  {
+    "id": "emp004",
+    "name": "Diana Prince",
+    "department": "Marketing",
+    "role": "Marketing Lead",
+    "salary": 80000,
+    "years_of_service": 4,
+    "performance_rating": 4.6
+  },
+  {
+    "id": "emp005",
+    "name": "Eve Williams",
+    "department": "Engineering",
+    "role": "DevOps Engineer",
+    "salary": 90000,
+    "years_of_service": 3,
+    "performance_rating": 4.3
+  },
+  {
+    "id": "emp006",
+    "name": "Frank Miller",
+    "department": "Sales",
+    "role": "Sales Representative",
+    "salary": 55000,
+    "years_of_service": 1,
+    "performance_rating": 3.9
+  },
+  {
+    "id": "emp007",
+    "name": "Grace Lee",
+    "department": "Marketing",
+    "role": "Content Writer",
+    "salary": 58000,
+    "years_of_service": 2,
+    "performance_rating": 4.2
+  },
+  {
+    "id": "emp008",
+    "name": "Henry Wilson",
+    "department": "Engineering",
+    "role": "Tech Lead",
+    "salary": 110000,
+    "years_of_service": 8,
+    "performance_rating": 4.7
+  }
+]

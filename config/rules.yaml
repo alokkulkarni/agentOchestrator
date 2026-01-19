@@ -12,8 +12,36 @@ rules:
         value: "calculate"
         case_sensitive: false
       - field: "query"
+        operator: "contains"
+        value: "add"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "subtract"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "multiply"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "divide"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "sum"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "average"
+        case_sensitive: false
+      - field: "query"
         operator: "regex"
         value: "\\d+\\s*[+\\-*/]\\s*\\d+"
+        case_sensitive: false
+      - field: "operation"
+        operator: "exists"
+        value: null
         case_sensitive: false
     logic: "or"  # Match if ANY condition is true
     target_agents:
@@ -21,7 +49,45 @@ rules:
     confidence: 0.95
     enabled: true
 
-  # Rule for search/retrieval queries
+  # Rule for web/internet search queries (Tavily)
+  - name: "web_search_queries"
+    priority: 95
+    conditions:
+      - field: "query"
+        operator: "contains"
+        value: "web search"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "internet search"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "online"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "latest"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "current"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "real-time"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "news"
+        case_sensitive: false
+    logic: "or"
+    target_agents:
+      - "tavily_search"
+    confidence: 0.90
+    enabled: true
+
+  # Rule for search/retrieval queries (local documents)
   - name: "search_queries"
     priority: 90
     conditions:

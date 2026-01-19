@@ -224,13 +224,23 @@ def format_result(result: Dict[str, Any]) -> str:
 
                 # For search results, show count and top results
                 elif 'results' in agent_data and isinstance(agent_data['results'], list):
-                    total = agent_data.get('total_count', len(agent_data['results']))
+                    # Show AI-generated answer first (if available)
+                    if 'answer' in agent_data and agent_data['answer']:
+                        output.append(f"    {Colors.BOLD}Answer:{Colors.ENDC}")
+                        answer_text = agent_data['answer']
+                        # Wrap long answers
+                        if len(answer_text) > 200:
+                            answer_text = answer_text[:200] + "..."
+                        output.append(f"    {answer_text}")
+                        output.append("")  # Blank line
+
+                    total = agent_data.get('total_count', agent_data.get('total_results', len(agent_data['results'])))
                     output.append(f"    Total Results: {total}")
                     if agent_data['results']:
                         output.append(f"    Top Results:")
                         for i, r in enumerate(agent_data['results'][:3], 1):
                             title = r.get('title', 'Untitled')
-                            relevance = r.get('relevance', 0)
+                            relevance = r.get('relevance', r.get('score', 0))
                             output.append(f"      {i}. {title} (relevance: {relevance:.2f})")
 
                 # For other dict data, show key info

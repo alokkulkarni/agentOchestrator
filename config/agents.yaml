@@ -121,6 +121,74 @@ agents:
       index_size: "1000 documents"
 
   # ============================================================================
+  # TAVILY SEARCH AGENT - AI-powered web search
+  # ============================================================================
+  - name: "tavily_search"
+    type: "direct"
+    direct_tool:
+      module: "examples.sample_tavily_search"
+      function: "get_tavily_search"
+      is_async: false  # Using sync wrapper
+
+    capabilities:
+      - "web-search"
+      - "real-time-search"
+      - "ai-search"
+      - "internet"
+      - "research"
+
+    # Role definition - external API with rate limits
+    role:
+      name: "web-researcher"
+      description: "AI-powered web search using Tavily API"
+      allowed_operations:
+        - "search"
+        - "query"
+        - "research"
+      denied_operations:
+        - "scrape"  # No web scraping
+        - "crawl"   # No crawling
+        - "download"  # No file downloads
+      max_execution_time: 30  # Network calls may take time
+      max_input_size: 10000
+      require_approval: false
+      guardrails:
+        max_results: 20  # API limit
+        safe_search: true  # Filter inappropriate content
+        require_valid_query: true
+        cache_results: true
+        cache_ttl: 3600  # 1 hour cache
+
+    constraints:
+      max_retries: 2
+      timeout: 30
+      rate_limit: 10  # Respect Tavily API limits (depends on plan)
+      require_validation: false
+      allowed_input_fields:
+        - "query"
+        - "search_depth"
+        - "max_results"
+        - "include_domains"
+        - "exclude_domains"
+        - "include_answer"
+        - "include_images"
+      denied_input_fields:
+        - "api_key"  # API key from environment only
+        - "credentials"
+      output_sanitization: true
+      log_level: "INFO"
+
+    fallback: "search"  # Fallback to local search if Tavily fails
+    enabled: true
+    metadata:
+      description: "AI-powered web search via Tavily API"
+      version: "1.0.0"
+      api_provider: "tavily"
+      api_docs: "https://docs.tavily.com/"
+      requires_api_key: true
+      env_var: "TAVILY_API_KEY"
+
+  # ============================================================================
   # DATA PROCESSOR - Restricted with validation required
   # ============================================================================
   - name: "data_processor"
@@ -184,7 +252,70 @@ agents:
       supported_formats: ["json", "dict"]
 
   # ============================================================================
-  # WEATHER AGENT (MCP) - Example MCP server with role
+  # MCP CALCULATOR - Example MCP server demonstrating MCP protocol
+  # ============================================================================
+  # NOTE: Disabled by default - requires MCP server running
+  # To enable:
+  #   1. Start MCP server in terminal 1: python examples/sample_mcp_server.py --http
+  #   2. Set enabled to true below
+  #   3. Restart orchestrator in terminal 2
+  # Or use stdio transport (no HTTP server needed):
+  #   1. Set MCP_CALC_URL=stdio in .env
+  #   2. Set enabled to true
+  #   3. Orchestrator will launch server as subprocess
+  - name: "mcp_calculator"
+    type: "mcp"
+    connection:
+      url: "${MCP_CALC_URL:http://localhost:8080}"  # HTTP or stdio
+      timeout: 30
+      headers: {}
+
+    capabilities:
+      - "math"
+      - "calculation"
+      - "mcp-example"
+      - "arithmetic"
+
+    role:
+      name: "mcp-calculator"
+      description: "Calculator via MCP protocol (demonstrat example)"
+      allowed_operations:
+        - "add"
+        - "subtract"
+        - "multiply"
+        - "divide"
+      denied_operations: []
+      max_execution_time: 10
+      max_input_size: 1000
+      require_approval: false
+      guardrails:
+        validate_numbers: true
+        prevent_divide_by_zero: true
+
+    constraints:
+      max_retries: 2
+      timeout: 10
+      rate_limit: 30  # Local server, higher limit
+      require_validation: true
+      allowed_input_fields:
+        - "a"
+        - "b"
+        - "operation"
+        - "query"
+      denied_input_fields: []
+      output_sanitization: true
+      log_level: "INFO"
+
+    fallback: "calculator"  # Fallback to direct calculator
+    enabled: true  # ENABLED for demo
+    metadata:
+      description: "MCP calculator server demonstrating MCP protocol"
+      version: "1.0.0"
+      transport: "http or stdio"
+      server_file: "examples/sample_mcp_server.py"
+
+  # ============================================================================
+  # WEATHER AGENT (MCP) - Example MCP server with weather data
   # ============================================================================
   # NOTE: Disabled by default - requires MCP server running
   # To enable:

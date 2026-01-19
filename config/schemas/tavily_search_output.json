@@ -1,0 +1,107 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Tavily Search Output Schema",
+  "description": "Schema for validating Tavily web search agent outputs",
+  "type": "object",
+  "required": ["success", "query", "results", "total_results"],
+  "properties": {
+    "success": {
+      "type": "boolean",
+      "description": "Whether the search was successful"
+    },
+    "query": {
+      "type": "string",
+      "description": "The original search query",
+      "minLength": 1
+    },
+    "results": {
+      "type": "array",
+      "description": "Array of search results from the web",
+      "items": {
+        "type": "object",
+        "required": ["title", "url", "content"],
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Title of the web page"
+          },
+          "url": {
+            "type": "string",
+            "description": "URL of the web page",
+            "format": "uri"
+          },
+          "content": {
+            "type": "string",
+            "description": "Content snippet or summary"
+          },
+          "score": {
+            "type": "number",
+            "description": "Relevance score (0-1)",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "raw_content": {
+            "type": ["string", "null"],
+            "description": "Full page content (if requested)"
+          }
+        }
+      }
+    },
+    "answer": {
+      "type": "string",
+      "description": "AI-generated answer summary from search results"
+    },
+    "images": {
+      "type": "array",
+      "description": "Relevant images from search results",
+      "items": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "total_results": {
+      "type": "integer",
+      "description": "Total number of results returned",
+      "minimum": 0
+    },
+    "search_depth": {
+      "type": "string",
+      "description": "Depth of search performed",
+      "enum": ["basic", "advanced"]
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the search was performed"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional search metadata",
+      "properties": {
+        "api": {
+          "type": "string",
+          "const": "tavily"
+        },
+        "version": {
+          "type": "string"
+        }
+      }
+    },
+    "error": {
+      "type": "string",
+      "description": "Error message if search failed"
+    },
+    "hint": {
+      "type": "string",
+      "description": "Helpful hint for resolving errors"
+    }
+  }
+}

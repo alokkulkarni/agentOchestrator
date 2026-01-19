@@ -174,6 +174,19 @@ if __name__ == "__main__":
     print("Starting Calculator MCP Server...")
     print("Available tools: add, subtract, multiply, divide, get_weather")
     print("Server will be available at http://localhost:8080")
+    print("\nTo run via HTTP:")
+    print("  python examples/sample_mcp_server.py --http")
+    print("\nTo run via stdio:")
+    print("  python examples/sample_mcp_server.py")
 
-    # Run the server (FastMCP will handle HTTP server setup)
-    mcp.run(transport="stdio")  # Use stdio transport for testing
+    import sys
+
+    # Check if --http flag is provided
+    if "--http" in sys.argv:
+        print("\n✅ Starting HTTP server on http://localhost:8080")
+        # Run the server with HTTP transport
+        mcp.run(transport="sse", port=8080)
+    else:
+        print("\n✅ Starting stdio server (for direct process communication)")
+        # Run the server with stdio transport (for subprocess-based MCP)
+        mcp.run(transport="stdio")

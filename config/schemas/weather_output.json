@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Weather Service Output Schema",
+  "description": "Schema for validating weather service (MCP) outputs",
+  "type": "object",
+  "required": ["city", "temperature", "condition", "humidity", "unit"],
+  "properties": {
+    "city": {
+      "type": "string",
+      "description": "Name of the city",
+      "minLength": 1
+    },
+    "temperature": {
+      "type": "number",
+      "description": "Current temperature"
+    },
+    "condition": {
+      "type": "string",
+      "description": "Weather condition description",
+      "examples": ["Sunny", "Cloudy", "Rainy", "Partly Cloudy", "Unknown"]
+    },
+    "humidity": {
+      "type": "number",
+      "description": "Humidity percentage",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "unit": {
+      "type": "string",
+      "description": "Temperature unit",
+      "enum": ["fahrenheit", "celsius", "kelvin"]
+    },
+    "note": {
+      "type": "string",
+      "description": "Additional notes or warnings"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the weather data was retrieved"
+    },
+    "source": {
+      "type": "string",
+      "description": "Data source (e.g., 'mock', 'api')"
+    }
+  }
+}

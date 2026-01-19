@@ -41,9 +41,12 @@ class MCPConnectionConfig(BaseModel):
     @field_validator("url")
     @classmethod
     def validate_url(cls, v: str) -> str:
-        """Validate URL format."""
+        """Validate URL format. Accepts HTTP/HTTPS URLs or 'stdio' for subprocess transport."""
+        if v == "stdio":
+            # Special case for MCP stdio transport (subprocess-based)
+            return v
         if not v.startswith(("http://", "https://")):
-            raise ValueError("URL must start with http:// or https://")
+            raise ValueError("URL must start with http://, https://, or be 'stdio'")
         return v
 
 

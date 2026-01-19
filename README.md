@@ -64,6 +64,7 @@ Agent Orchestrator is a powerful framework for building intelligent multi-agent 
 │  │  Agents:                    Capability Index:               │  │
 │  │  • calculator               • "math" → [calculator]         │  │
 │  │  • search                   • "search" → [search]           │  │
+│  │  • tavily_search            • "web-search" → [tavily]       │  │
 │  │  • data_processor           • "data" → [data_processor]     │  │
 │  │  • admin_agent              • "admin" → [admin_agent]       │  │
 │  │  • weather (MCP)            • "weather" → [weather]         │  │
@@ -116,7 +117,9 @@ pip install -r requirements.txt
 
 # Set up environment variables
 cp .env.example .env
-# Edit .env and add your ANTHROPIC_API_KEY (for AI reasoning)
+# Edit .env and add your API keys:
+#   - ANTHROPIC_API_KEY (for AI reasoning)
+#   - TAVILY_API_KEY (optional, for web search)
 ```
 
 ### Basic Usage
@@ -148,6 +151,15 @@ async def main():
 
     print(f"Found {result['data']['search']['total_count']} results")
 
+    # Real-time web search (requires TAVILY_API_KEY)
+    result = await orchestrator.process({
+        "query": "latest AI news in 2026",
+        "max_results": 5
+    })
+
+    if 'tavily_search' in result['data']:
+        print(f"Answer: {result['data']['tavily_search']['answer']}")
+
     # Cleanup
     await orchestrator.cleanup()
 
@@ -169,6 +181,9 @@ python3 demo_agent_selection_simple.py
 
 # Run multi-agent workflow demonstration
 python3 demo_multi_agent.py
+
+# Test Tavily web search agent
+python3 test_tavily_agent.py
 
 # Run tests
 pytest tests/ -v --cov=agent_orchestrator
