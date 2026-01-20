@@ -12,6 +12,9 @@ from typing import Any, Dict, List, Optional
 import aiohttp
 from aiohttp import ClientError, ClientTimeout
 
+from .ai_reasoner import AgentPlan
+from ..agents.base_agent import BaseAgent
+
 logger = logging.getLogger(__name__)
 
 
@@ -75,19 +78,19 @@ class GatewayReasoner:
     async def reason(
         self,
         query: str,
-        agent_capabilities: List[Dict[str, Any]],
+        agent_capabilities: List,
         context: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+    ) -> Optional[AgentPlan]:
         """
         Use AI to reason about which agent(s) to call.
 
         Args:
             query: User's input query
-            agent_capabilities: List of available agents and their capabilities
+            agent_capabilities: List of available agents (BaseAgent objects)
             context: Optional context information
 
         Returns:
-            Reasoning result with agent selection
+            AgentPlan with agent selection or None if failed
         """
         # Build prompt for agent routing
         prompt = self._build_routing_prompt(query, agent_capabilities, context)
@@ -103,22 +106,44 @@ class GatewayReasoner:
             reasoning_text = response["content"]
 
             # Extract agent selection from response
-            result = self._parse_routing_response(reasoning_text, agent_capabilities)
+            plan = self._parse_routing_response(reasoning_text, agent_capabilities)
 
-            logger.info(
-                f"AI reasoning completed: selected {len(result.get('agents', []))} agent(s)"
-            )
-
-            return result
+            if plan:
+                logger.info(
+                    f"AI reasoning completed: selected {len(plan.agents)} agent(s)"
+                )
+                return plan
+            else:
+                logger.warning("AI reasoning returned no agents")
+                return None
 
         except Exception as e:
             logger.error(f"Error during AI reasoning: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-                "agents": [],
-                "reasoning": f"Failed to reason: {e}",
-            }
+            return None
+
+    async def validate_plan(
+        self,
+        plan: AgentPlan,
+        available_agents: List[BaseAgent],
+    ) -> bool:
+        """
+        Validate that a plan's agents exist and are healthy.
+
+        Args:
+            plan: Agent plan to validate
+            available_agents: List of available agents
+
+        Returns:
+            True if plan is valid
+        """
+        available_names = {agent.name for agent in available_agents}
+
+        for agent_name in plan.agents:
+            if agent_name not in available_names:
+                logger.warning(f"Plan references unknown agent: {agent_name}")
+                return False
+
+        return True
 
     async def validate_output(
         self,
@@ -355,7 +380,7 @@ class GatewayReasoner:
     def _build_routing_prompt(
         self,
         query: str,
-        agent_capabilities: List[Dict[str, Any]],
+        agent_capabilities: List,
         context: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Build prompt for agent routing decision."""
@@ -366,8 +391,8 @@ User Query: {query}
 Available Agents:
 """
         for idx, agent in enumerate(agent_capabilities, 1):
-            name = agent.get("name", "unknown")
-            capabilities = agent.get("capabilities", [])
+            name = agent.name
+            capabilities = agent.capabilities
             prompt += f"{idx}. {name}: {', '.join(capabilities)}\n"
 
         if context:
@@ -375,14 +400,51 @@ Available Agents:
 
         prompt += """
 Based on the query and available agents, respond with:
-1. Which agent(s) should be called
+1. Which agent(s) should be called (you CAN call same agent multiple times)
 2. Whether they should run in parallel or sequential
 3. Brief reasoning for your choice
+4. Agent-specific parameters extracted from the query
+
+IMPORTANT - Multi-Instance Support:
+  - You CAN call the same agent multiple times with different parameters
+  - For multiple calls, use numbered suffixes: agent_1, agent_2, etc.
+  - Example: For "weather in Paris and London":
+    AGENTS: weather, weather
+    PARAMETERS: {"weather_1": {"location": "Paris"}, "weather_2": {"location": "London"}}
+
+Parameter Extraction Guidelines:
+  For calculator agent - REQUIRED FORMAT:
+    - "operation": Use EXACT values: "add", "subtract", "multiply", "divide", "average", "power", "sqrt"
+    - "operands": MUST be a list of numbers [num1, num2, ...], OR
+    - "data_source": "previous" to use data from earlier agents
+    - "field": Field to extract (e.g., "temp" for temperature)
+    Examples:
+      "25 + 75" → {"operation": "add", "operands": [25, 75]}
+      "average temperature from previous results" → {"operation": "average", "data_source": "previous", "field": "temp"}
+
+  For weather agent:
+    - "location": City/location name as string
+    Example: "weather in Paris" → {"location": "Paris"}
+
+  For search agents:
+    - "keywords": List of search terms
+    Example: "search for AI" → {"keywords": ["AI"]}
+
+Data Chaining Example:
+  Query: "weather in Paris and London, calculate average"
+  AGENTS: weather, weather, calculator
+  MODE: sequential
+  PARAMETERS: {
+    "weather_1": {"location": "Paris"},
+    "weather_2": {"location": "London"},
+    "calculator": {"operation": "average", "data_source": "previous", "field": "temp"}
+  }
 
 Format your response as:
 AGENTS: [agent names separated by commas]
 MODE: [parallel or sequential]
 REASONING: [your reasoning]
+PARAMETERS: {"agent_name": {"param": value}, ...} (as JSON, MUST match exact format above)
 """
         return prompt
 
@@ -456,13 +518,36 @@ Task:
 3. If the selection is good, validate it
 4. If not appropriate, suggest which agents should be used instead
 
+IMPORTANT - Multi-Instance Support:
+- You CAN suggest calling the same agent multiple times with different parameters
+- For multiple calls, list the agent name multiple times in suggested_agents array
+- Use numbered suffixes in parameters (e.g., weather_1, weather_2, weather_3)
+
+Example for "weather in Paris, London, and Berlin":
+{{
+    "is_valid": false,
+    "confidence": 0.9,
+    "reasoning": "Need to call weather agent three times for three cities",
+    "suggested_agents": ["weather", "weather", "weather"],
+    "parameters": {{
+        "weather_1": {{"location": "Paris"}},
+        "weather_2": {{"location": "London"}},
+        "weather_3": {{"location": "Berlin"}}
+    }}
+}}
+
+For data chaining (when one agent needs output from previous agents):
+- Use "data_source": "previous" in parameters
+- Specify field to extract with "field": "temp"
+- Example: {{"calculator": {{"operation": "average", "data_source": "previous", "field": "temp"}}}}
+
 Respond in JSON format:
 {{
     "is_valid": true/false,
     "confidence": 0.0-1.0,
     "reasoning": "explanation",
-    "suggested_agents": ["agent1"] (only if is_valid is false),
-    "parameters": {{"agent_name": {{"param": "value"}}}}
+    "suggested_agents": ["agent1", "agent1", "agent2"] (can include duplicates),
+    "parameters": {{"agent_name_1": {{"param": "value"}}, "agent_name_2": {{"param": "value"}}}}
 }}"""
 
         # Create messages
@@ -487,6 +572,12 @@ Respond in JSON format:
                 json_str = json_match.group(0) if json_match else response_text
 
             result = json.loads(json_str)
+
+            # Normalize calculator parameters to expected format
+            if "parameters" in result:
+                result["parameters"] = self._normalize_calculator_parameters(result["parameters"])
+                logger.info(f"Normalized parameters in validation: {result['parameters']}")
+
             return result
 
         except Exception as e:
@@ -500,13 +591,79 @@ Respond in JSON format:
                 "parameters": {},
             }
 
+    def _normalize_calculator_parameters(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Normalize calculator parameters to the expected format.
+
+        Handles AI variations like:
+        - "division" -> "divide", "multiplication" -> "multiply", etc.
+        - {"operand1": 100, "operand2": 4} -> {"operands": [100, 4]}
+        - Removes extra fields like "expression"
+        """
+        if "calculator" not in parameters:
+            return parameters
+
+        calc_params = parameters["calculator"]
+        normalized = {}
+
+        # Normalize operation names
+        operation = calc_params.get("operation", "")
+        operation_map = {
+            "addition": "add",
+            "sum": "add",
+            "plus": "add",
+            "subtraction": "subtract",
+            "minus": "subtract",
+            "difference": "subtract",
+            "multiplication": "multiply",
+            "times": "multiply",
+            "product": "multiply",
+            "division": "divide",
+            "div": "divide",
+            "divided": "divide",
+        }
+        normalized["operation"] = operation_map.get(operation.lower(), operation)
+
+        # Normalize operands - convert from operand1, operand2, etc. to list
+        if "operands" in calc_params:
+            # Already in correct format
+            normalized["operands"] = calc_params["operands"]
+        elif "operand1" in calc_params and "operand2" in calc_params:
+            # Convert operand1, operand2 to list
+            operands = [calc_params["operand1"], calc_params["operand2"]]
+            # Add any additional operands
+            i = 3
+            while f"operand{i}" in calc_params:
+                operands.append(calc_params[f"operand{i}"])
+                i += 1
+            normalized["operands"] = operands
+        elif "numbers" in calc_params:
+            # Alternative format
+            normalized["operands"] = calc_params["numbers"]
+
+        # If calculator has operation but no operands, assume it needs data from previous agents
+        if "operation" in normalized and "operands" not in normalized:
+            if normalized["operation"] in ["average", "avg", "mean", "sum", "add"]:
+                # These operations typically need data from previous responses
+                normalized["data_source"] = "previous"
+                normalized["field"] = "temp"  # Default to temperature for weather
+                logger.info(f"Auto-added data chaining for calculator: {normalized['operation']}")
+
+        parameters["calculator"] = normalized
+        logger.info(f"Normalized calculator parameters: {normalized}")
+        return parameters
+
     def _parse_routing_response(
-        self, response_text: str, agent_capabilities: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
-        """Parse AI routing response into structured format."""
+        self, response_text: str, agent_capabilities: List
+    ) -> Optional[AgentPlan]:
+        """Parse AI routing response into an AgentPlan."""
+        import json
+        import re
+
         agents = []
-        mode = "sequential"
+        parallel = False
         reasoning = response_text
+        parameters = {}
 
         # Extract agents
         if "AGENTS:" in response_text:
@@ -516,28 +673,51 @@ Respond in JSON format:
             # Match to actual agent objects
             for name in agent_names:
                 for agent in agent_capabilities:
-                    if agent.get("name", "").lower() == name.lower():
-                        agents.append(agent)
+                    if agent.name.lower() == name.lower():
+                        agents.append(agent.name)
                         break
 
         # Extract mode
         if "MODE:" in response_text:
             mode_line = response_text.split("MODE:")[1].split("\n")[0].strip().lower()
             if "parallel" in mode_line:
-                mode = "parallel"
-            else:
-                mode = "sequential"
+                parallel = True
 
         # Extract reasoning
         if "REASONING:" in response_text:
-            reasoning = response_text.split("REASONING:")[1].strip()
+            reasoning_section = response_text.split("REASONING:")[1]
+            # Stop at PARAMETERS if it exists
+            if "PARAMETERS:" in reasoning_section:
+                reasoning = reasoning_section.split("PARAMETERS:")[0].strip()
+            else:
+                reasoning = reasoning_section.strip()
 
-        return {
-            "success": True,
-            "agents": agents,
-            "mode": mode,
-            "reasoning": reasoning,
-        }
+        # Extract parameters
+        if "PARAMETERS:" in response_text:
+            params_section = response_text.split("PARAMETERS:")[1].strip()
+            try:
+                # Try to parse as JSON
+                # Handle both single-line and multi-line JSON
+                json_match = re.search(r'\{.*\}', params_section, re.DOTALL)
+                if json_match:
+                    params_str = json_match.group(0)
+                    parameters = json.loads(params_str)
+                    logger.info(f"Extracted parameters: {parameters}")
+            except json.JSONDecodeError as e:
+                logger.warning(f"Failed to parse PARAMETERS as JSON: {e}")
+                # Continue without parameters
+
+        # Return AgentPlan if we have agents
+        if agents:
+            return AgentPlan(
+                agents=agents,
+                reasoning=reasoning,
+                confidence=0.8,  # Default confidence for gateway reasoner
+                parallel=parallel,
+                parameters=parameters,
+            )
+
+        return None
 
     def get_stats(self) -> Dict[str, Any]:
         """

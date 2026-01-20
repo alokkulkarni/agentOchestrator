@@ -205,7 +205,14 @@ class ResponseFormatter:
 
     def _format_generic(self, agent_name: str, data: Dict[str, Any]) -> str:
         """Generic formatter for unknown agent types."""
-        lines = [f"📤 {agent_name.replace('_', ' ').title()} Results:"]
+        # Strip numeric suffix from agent name (e.g., "weather_1" -> "weather")
+        display_name = agent_name
+        if '_' in agent_name:
+            parts = agent_name.rsplit('_', 1)
+            if len(parts) == 2 and parts[1].isdigit():
+                display_name = parts[0]
+
+        lines = [f"📤 {display_name.replace('_', ' ').title()} Results:"]
 
         # Try to extract key information
         if 'success' in data and not data['success']:

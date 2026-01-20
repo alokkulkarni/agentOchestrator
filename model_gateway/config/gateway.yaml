@@ -35,7 +35,7 @@ providers:
     type: "bedrock"
     enabled: true
     region: "us-east-1"  # Override with GATEWAY_AWS_REGION
-    model_id: "anthropic.claude-sonnet-3-5-v2-20241022"
+    model_id: "anthropic.claude-3-haiku-20240307-v1:0"  # Claude 3 Haiku (stable, widely available)
     # Optional: AWS profile (override with GATEWAY_AWS_PROFILE)
     aws_profile: null
     # Optional: IAM role ARN for cross-account access

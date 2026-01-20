@@ -308,6 +308,7 @@ class HybridReasoner:
                                     confidence=validation["confidence"],
                                     method="ai_override",
                                     reasoning=f"AI override of multi-rule: {validation['reasoning']}",
+                                    parameters=validation.get("parameters", {}),
                                     parallel=False,
                                     rule_matches=rule_matches,
                                 )
@@ -343,6 +344,7 @@ class HybridReasoner:
                             method="rule_validated",
                             reasoning=f"Rule '{best_match.rule_name}' validated by AI: {validation['reasoning']}",
                             parallel=False,
+                            parameters=validation.get("parameters", {}),
                             rule_matches=rule_matches,
                         )
                     else:
@@ -366,6 +368,7 @@ class HybridReasoner:
                                     method="ai_override",
                                     reasoning=f"AI override: {validation['reasoning']}",
                                     parallel=False,
+                                    parameters=validation.get("parameters", {}),
                                     rule_matches=rule_matches,
                                 )
 
@@ -403,6 +406,7 @@ class HybridReasoner:
 
         # Validate AI plan
         is_valid = await self.ai_reasoner.validate_plan(ai_plan, available_agents)
+
         if not is_valid:
             logger.warning("AI plan invalid, falling back to rules")
             if rule_matches:

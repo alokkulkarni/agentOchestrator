@@ -44,7 +44,8 @@ class BedrockProvider(BaseProvider):
         """Create Bedrock runtime client with appropriate credentials."""
         # Start with session configuration
         session_kwargs = {}
-        if self.aws_profile:
+        # Only add profile_name if explicitly set (not None or empty string)
+        if self.aws_profile and self.aws_profile.strip():
             session_kwargs["profile_name"] = self.aws_profile
 
         session = boto3.Session(**session_kwargs)

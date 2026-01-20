@@ -136,16 +136,34 @@ class OutputFormatter:
         # Determine overall success (all must succeed)
         overall_success = all(r.success for r in responses)
 
-        # Merge data from all successful responses
+        # First pass: count occurrences of each agent name
+        agent_counts = {}
+        for response in responses:
+            agent_counts[response.agent_name] = agent_counts.get(response.agent_name, 0) + 1
+
+        # Second pass: merge data with automatic indexing for duplicates
+        agent_indices = {}  # Track current index for each agent
         merged_data = {}
         errors = []
 
         for response in responses:
+            agent_name = response.agent_name
+
+            # Increment index for this agent
+            agent_indices[agent_name] = agent_indices.get(agent_name, 0) + 1
+            current_index = agent_indices[agent_name]
+
+            # Use indexed key if agent appears multiple times
+            if agent_counts[agent_name] > 1:
+                key = f"{agent_name}_{current_index}"
+            else:
+                key = agent_name
+
             if response.success:
-                merged_data[response.agent_name] = response.data
+                merged_data[key] = response.data
             else:
                 errors.append({
-                    "agent": response.agent_name,
+                    "agent": key,
                     "error": response.error
                 })
 

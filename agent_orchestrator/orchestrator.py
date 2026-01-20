@@ -753,16 +753,48 @@ class Orchestrator:
         parallel: bool,
         parameters: Dict[str, Dict[str, Any]],
     ):
-        """Execute the selected agents with retry and fallback logic."""
+        """
+        Execute the selected agents with retry and fallback logic.
+
+        Supports:
+        - Multiple calls to the same agent with numbered parameters (weather_1, weather_2)
+        - Data chaining: extracting data from previous responses
+        """
         agents = []
+        agent_instances = []  # Track (agent, param_key, params) for each call
         fallback_map = {}
 
+        # Count occurrences of each agent name for numbering
+        agent_counts = {}
+        for agent_name in agent_names:
+            agent_counts[agent_name] = agent_counts.get(agent_name, 0) + 1
+
+        # Build agent instances with proper parameter mapping
+        agent_call_index = {}  # Track which call number we're on for each agent
         for agent_name in agent_names:
             agent = self.agent_registry.get(agent_name)
             if not agent:
                 logger.warning(f"Agent {agent_name} not found in registry")
                 continue
 
+            # Determine parameter key for this instance
+            if agent_counts[agent_name] > 1:
+                # Multiple calls - use numbered suffix
+                call_num = agent_call_index.get(agent_name, 0) + 1
+                agent_call_index[agent_name] = call_num
+                param_key = f"{agent_name}_{call_num}"
+            else:
+                # Single call - use agent name
+                param_key = agent_name
+
+            # Get parameters for this specific call
+            agent_params = parameters.get(param_key, {})
+
+            agent_instances.append({
+                "agent": agent,
+                "param_key": param_key,
+                "params": agent_params,
+            })
             agents.append(agent)
 
             # Get fallback agent from configuration
@@ -774,17 +806,20 @@ class Orchestrator:
             logger.error("No valid agents found for execution")
             return []
 
-        # Prepare input data with agent-specific parameters
-        def get_agent_input(agent_name: str) -> Dict[str, Any]:
-            agent_params = parameters.get(agent_name, {})
-            return {**input_data, **agent_params}
-
-        # Build per-agent input data
-        per_agent_input = {agent.name: get_agent_input(agent.name) for agent in agents}
+        logger.info(f"Executing {len(agents)} agent calls (parallel={parallel})")
+        for idx, inst in enumerate(agent_instances):
+            logger.info(f"  Call {idx + 1}: {inst['agent'].name} (params: {inst['param_key']})")
 
         # Execute with retry handler
         if parallel:
             # Call agents in parallel with agent-specific parameters
+            per_agent_input = {}
+            for idx, inst in enumerate(agent_instances):
+                agent_input = {**input_data, **inst["params"]}
+                # Use unique key for each instance
+                unique_key = f"{inst['agent'].name}_{idx}"
+                per_agent_input[unique_key] = agent_input
+
             responses = await self.retry_handler.call_multiple_with_retry(
                 agents=agents,
                 input_data=input_data,
@@ -794,10 +829,30 @@ class Orchestrator:
                 per_agent_input=per_agent_input,
             )
         else:
-            # Call agents sequentially
+            # Call agents sequentially with data chaining support
             responses = []
-            for agent in agents:
-                agent_input = get_agent_input(agent.name)
+            previous_responses = []  # Track responses for data extraction
+
+            for idx, inst in enumerate(agent_instances):
+                agent = inst["agent"]
+                agent_params = inst["params"].copy()
+
+                # Check if this agent needs data from previous responses
+                if agent_params.get("data_source") == "previous":
+                    logger.info(f"Agent {agent.name} requires data from previous responses")
+                    # Extract data from previous responses
+                    extracted_data = self._extract_data_from_responses(
+                        previous_responses,
+                        field=agent_params.get("field"),
+                        operation=agent_params.get("operation")
+                    )
+                    # Merge extracted data into parameters
+                    agent_params.update(extracted_data)
+                    # Remove meta parameters
+                    agent_params.pop("data_source", None)
+                    agent_params.pop("field", None)
+
+                agent_input = {**input_data, **agent_params}
                 response = await self.retry_handler.call_with_retry(
                     agent=agent,
                     input_data=agent_input,
@@ -805,6 +860,7 @@ class Orchestrator:
                     fallback_agent_name=fallback_map.get(agent.name),
                 )
                 responses.append(response)
+                previous_responses.append(response)
 
                 # Update circuit breaker
                 if response.success:
@@ -813,6 +869,62 @@ class Orchestrator:
                     self.circuit_breaker.record_failure(agent.name)
 
         return responses
+
+    def _extract_data_from_responses(
+        self,
+        responses: List[Any],
+        field: Optional[str] = None,
+        operation: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Extract data from previous agent responses for chaining.
+
+        Args:
+            responses: List of previous agent responses
+            field: Field to extract from responses (e.g., "temp", "temperature")
+            operation: Operation to perform (e.g., "average", "sum")
+
+        Returns:
+            Dictionary with extracted/computed data as parameters
+        """
+        if not responses:
+            logger.warning("No previous responses to extract data from")
+            return {}
+
+        extracted_values = []
+
+        # Extract specified field from each response
+        for response in responses:
+            if not response.success:
+                logger.warning(f"Skipping failed response from {response.agent_name}")
+                continue
+
+            value = None
+            if field and response.data:
+                # Try to extract the field from response data
+                if isinstance(response.data, dict):
+                    # Handle nested structures (e.g., current.temp in weather)
+                    if "current" in response.data and field in ["temp", "temperature"]:
+                        value = response.data["current"].get("temp")
+                    else:
+                        value = response.data.get(field)
+
+            if value is not None:
+                extracted_values.append(value)
+                logger.info(f"Extracted {field}={value} from {response.agent_name}")
+
+        if not extracted_values:
+            logger.warning(f"No values extracted for field '{field}'")
+            return {}
+
+        # Return extracted values formatted for calculator
+        if operation:
+            return {
+                "operation": operation,
+                "operands": extracted_values,
+            }
+        else:
+            return {"values": extracted_values}
 
     async def _execute_and_validate(
         self,

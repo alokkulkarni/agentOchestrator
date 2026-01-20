@@ -143,18 +143,39 @@ User Request:
 ```
 
 Analyze the request and respond with a JSON object containing:
-1. "agents": List of agent names to call (in order if sequential)
+1. "agents": List of agent names to call (in order if sequential). You CAN call the same agent multiple times.
 2. "reasoning": Explanation of why you selected these agents
 3. "confidence": Your confidence score from 0.0 to 1.0
 4. "parallel": Boolean - whether agents can be called in parallel
-5. "parameters": Optional object with agent-specific parameters {{agent_name: {{param: value}}}}
+5. "parameters": Object with agent-specific parameters
 
 Guidelines:
 - Select only agents whose capabilities match the request
-- Prefer fewer agents when possible (don't over-complicate)
-- Use parallel execution only if agents are independent
+- You CAN call the same agent multiple times with different parameters
+- For multiple calls to the same agent, use numbered suffixes in parameters (e.g., "weather_1", "weather_2")
+- Use parallel execution when agents are independent (e.g., weather for multiple cities)
+- Use sequential execution when later agents depend on earlier results
 - Provide clear reasoning for your selection
 - Be conservative with confidence scores
+
+IMPORTANT - Multi-call Example:
+For "weather in Paris and London, calculate average":
+{{
+  "agents": ["weather", "weather", "calculator"],
+  "reasoning": "Need weather for two cities (parallel), then calculate average (sequential)",
+  "confidence": 0.9,
+  "parallel": false,
+  "parameters": {{
+    "weather_1": {{"location": "Paris"}},
+    "weather_2": {{"location": "London"}},
+    "calculator": {{"operation": "average", "data_source": "previous", "field": "temp"}}
+  }}
+}}
+
+Data Chaining:
+- If an agent needs data from previous agents, use {{"data_source": "previous"}} in parameters
+- Specify which field to extract with "field" parameter
+- The orchestrator will automatically extract and pass the data
 
 Respond with ONLY the JSON object, no additional text."""
 
@@ -241,6 +262,68 @@ Respond with ONLY the JSON object, no additional text."""
             logger.error(f"AI reasoning failed: {e}", exc_info=True)
             return None
 
+    def _normalize_calculator_parameters(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Normalize calculator parameters to the expected format.
+
+        Handles AI variations like:
+        - "division" -> "divide", "multiplication" -> "multiply", etc.
+        - {"operand1": 100, "operand2": 4} -> {"operands": [100, 4]}
+        - Removes extra fields like "expression"
+        """
+        if "calculator" not in parameters:
+            return parameters
+
+        calc_params = parameters["calculator"]
+        normalized = {}
+
+        # Normalize operation names
+        operation = calc_params.get("operation", "")
+        operation_map = {
+            "addition": "add",
+            "sum": "add",
+            "plus": "add",
+            "subtraction": "subtract",
+            "minus": "subtract",
+            "difference": "subtract",
+            "multiplication": "multiply",
+            "times": "multiply",
+            "product": "multiply",
+            "division": "divide",
+            "div": "divide",
+            "divided": "divide",
+        }
+        normalized["operation"] = operation_map.get(operation.lower(), operation)
+
+        # Normalize operands - convert from operand1, operand2, etc. to list
+        if "operands" in calc_params:
+            # Already in correct format
+            normalized["operands"] = calc_params["operands"]
+        elif "operand1" in calc_params and "operand2" in calc_params:
+            # Convert operand1, operand2 to list
+            operands = [calc_params["operand1"], calc_params["operand2"]]
+            # Add any additional operands
+            i = 3
+            while f"operand{i}" in calc_params:
+                operands.append(calc_params[f"operand{i}"])
+                i += 1
+            normalized["operands"] = operands
+        elif "numbers" in calc_params:
+            # Alternative format
+            normalized["operands"] = calc_params["numbers"]
+
+        # If calculator has operation but no operands, assume it needs data from previous agents
+        if "operation" in normalized and "operands" not in normalized:
+            if normalized["operation"] in ["average", "avg", "mean", "sum", "add"]:
+                # These operations typically need data from previous responses
+                normalized["data_source"] = "previous"
+                normalized["field"] = "temp"  # Default to temperature for weather
+                logger.info(f"Auto-added data chaining for calculator: {normalized['operation']}")
+
+        parameters["calculator"] = normalized
+        logger.info(f"Normalized calculator parameters: {normalized}")
+        return parameters
+
     async def validate_plan(
         self,
         plan: AgentPlan,
@@ -293,6 +376,8 @@ Respond with ONLY the JSON object, no additional text."""
                 "suggested_agents": List[str] (if is_valid is False)
             }
         """
+        logger.info(f"validate_rule_selection called for agents: {rule_selected_agents}")
+
         try:
             # Build context about available agents
             agent_context = self._build_agent_context(available_agents)
@@ -332,8 +417,21 @@ Important:
 - is_valid should be false only if there's a clear mismatch
 - suggested_agents should only be provided if is_valid is false
 - parameters should contain agent-specific parameters extracted from the user request
-  Example: For "calculate 25 + 75", calculator agent needs {{"operation": "add", "operands": [25, 75]}}
-  Example: For "search for machine learning", search agent needs {{"keywords": ["machine learning"]}}
+
+Parameter Format Guidelines:
+  For calculator agent:
+    - "operation": Use exact values: "add", "subtract", "multiply", "divide", "power", "sqrt" (NOT "addition", "division", etc.)
+    - "operands": Must be a list of numbers like [25, 75], NOT separate operand1/operand2 fields
+    Example: For "calculate 25 + 75", use {{"operation": "add", "operands": [25, 75]}}
+    Example: For "100 divided by 4", use {{"operation": "divide", "operands": [100, 4]}}
+
+  For search agents:
+    - "keywords": List of search terms
+    Example: For "search for machine learning", use {{"keywords": ["machine learning"]}}
+
+  For weather agent:
+    - "location": String with city/location name
+    Example: For "weather in Paris", use {{"location": "Paris"}}
 """
 
             # Call Claude
@@ -372,12 +470,19 @@ Important:
                 }
 
             # Ensure all required fields are present
+            parameters = validation.get("parameters", {})
+            logger.info(f"Parameters before normalization: {parameters}")
+
+            # Normalize calculator parameters to expected format
+            parameters = self._normalize_calculator_parameters(parameters)
+            logger.info(f"Parameters after normalization: {parameters}")
+
             result = {
                 "is_valid": validation.get("is_valid", True),
                 "confidence": float(validation.get("confidence", 0.5)),
                 "reasoning": validation.get("reasoning", "No reasoning provided"),
                 "suggested_agents": validation.get("suggested_agents", []),
-                "parameters": validation.get("parameters", {}),
+                "parameters": parameters,
             }
 
             logger.info(
