@@ -315,6 +315,63 @@ agents:
       server_file: "examples/sample_mcp_server.py"
 
   # ============================================================================
+  # WEATHER AGENT (Direct) - Simple weather lookups
+  # ============================================================================
+  - name: "weather"
+    type: "direct"
+    direct_tool:
+      module: "examples.sample_weather"
+      function: "get_weather"
+      is_async: false
+
+    capabilities:
+      - "weather"
+      - "forecast"
+      - "climate"
+      - "temperature"
+      - "conditions"
+
+    role:
+      name: "weather-info"
+      description: "Provides weather information for locations worldwide"
+      allowed_operations:
+        - "get_weather"
+        - "get_forecast"
+        - "check_conditions"
+      denied_operations:
+        - "set_weather"
+        - "modify"
+      max_execution_time: 10
+      max_input_size: 1000
+      require_approval: false
+      guardrails:
+        require_valid_location: true
+
+    constraints:
+      max_retries: 2
+      timeout: 10
+      rate_limit: 30
+      require_validation: false
+      allowed_input_fields:
+        - "location"
+        - "city"
+        - "units"
+        - "include_forecast"
+      denied_input_fields:
+        - "api_key"
+        - "credentials"
+      output_sanitization: true
+      log_level: "INFO"
+
+    fallback: "tavily_search"
+    enabled: true  # Uses mock data if no API key
+    metadata:
+      description: "Weather information with optional OpenWeatherMap API"
+      version: "1.0.0"
+      api_provider: "openweathermap"
+      note: "Uses mock data if OPENWEATHER_API_KEY not set"
+
+  # ============================================================================
   # WEATHER AGENT (MCP) - Example MCP server with weather data
   # ============================================================================
   # NOTE: Disabled by default - requires MCP server running
@@ -322,7 +379,7 @@ agents:
   #   1. Start the weather MCP server: python examples/sample_weather_server.py
   #   2. Set enabled to true
   #   3. Restart orchestrator
-  - name: "weather"
+  - name: "weather_mcp"
     type: "mcp"
     connection:
       url: "${MCP_WEATHER_URL:stdio}"  # Use stdio transport for local testing

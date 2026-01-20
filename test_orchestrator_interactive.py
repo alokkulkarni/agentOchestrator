@@ -353,6 +353,51 @@ def format_result(result: Dict[str, Any]) -> str:
                     if 'expression' in agent_data:
                         output.append(f"    Expression: {agent_data['expression']}")
 
+                # For weather results, show detailed weather info
+                elif 'location' in agent_data and 'current' in agent_data:
+                    # Location info
+                    location = agent_data.get('location', {})
+                    loc_name = location.get('name', 'Unknown')
+                    country = location.get('country', '')
+                    if country and country != 'Unknown':
+                        loc_display = f"{loc_name}, {country}"
+                    else:
+                        loc_display = loc_name
+
+                    output.append(f"    📍 Location: {loc_display}")
+                    output.append("")
+
+                    # Current weather
+                    current = agent_data.get('current', {})
+                    unit_symbol = agent_data.get('unit_symbol', '°C')
+
+                    temp = current.get('temp')
+                    feels_like = current.get('feels_like')
+                    description = current.get('description', 'N/A')
+
+                    output.append(f"    🌡️  Temperature: {temp}{unit_symbol}")
+                    if feels_like is not None:
+                        output.append(f"    💨 Feels like: {feels_like}{unit_symbol}")
+                    output.append(f"    ☁️  Conditions: {description.title()}")
+
+                    # Additional details
+                    humidity = current.get('humidity')
+                    if humidity is not None:
+                        output.append(f"    💧 Humidity: {humidity}%")
+
+                    wind_speed = current.get('wind_speed')
+                    if wind_speed is not None:
+                        output.append(f"    🌬️  Wind Speed: {wind_speed} m/s")
+
+                    temp_min = current.get('temp_min')
+                    temp_max = current.get('temp_max')
+                    if temp_min is not None and temp_max is not None:
+                        output.append(f"    📊 Range: {temp_min}{unit_symbol} - {temp_max}{unit_symbol}")
+
+                    # Note if using mock data
+                    if 'note' in agent_data:
+                        output.append(f"\n    ⚠️  {agent_data['note']}")
+
                 # For search results, show count and top results
                 elif 'results' in agent_data and isinstance(agent_data['results'], list):
                     # Show AI-generated answer first (if available)

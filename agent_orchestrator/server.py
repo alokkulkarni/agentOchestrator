@@ -10,6 +10,12 @@ The actual API implementation is in agent_orchestrator.api.server
 if __name__ == "__main__":
     import uvicorn
     import os
+    from pathlib import Path
+    from dotenv import load_dotenv
+
+    # Load environment variables from .env file
+    env_path = Path(__file__).parent.parent / ".env"
+    load_dotenv(dotenv_path=env_path, override=False)  # Don't override existing env vars
 
     # Get configuration from environment
     host = os.getenv("ORCHESTRATOR_API_HOST", "0.0.0.0")

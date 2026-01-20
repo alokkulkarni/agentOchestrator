@@ -9,6 +9,8 @@ services:
       context: .
       dockerfile: model_gateway/Dockerfile
     container_name: model-gateway
+    env_file:
+      - .env  # Load environment variables from .env file
     ports:
       - "8585:8585"   # API and metrics endpoint (/metrics)
     environment:
@@ -69,6 +71,8 @@ services:
       context: .
       dockerfile: Dockerfile.api
     container_name: orchestrator-api
+    env_file:
+      - .env  # Load environment variables from .env file
     ports:
       - "8001:8001"   # API server
       - "9090:9090"   # Prometheus metrics endpoint

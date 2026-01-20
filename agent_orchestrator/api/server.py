@@ -237,6 +237,7 @@ async def query(
             return QueryResponse(
                 success=result.get("success", False),
                 data=result.get("data", {}),
+                formatted_text=result.get("formatted_text"),
                 request_id=request_id,
                 session_id=request.session_id,
                 metadata=result.get("_metadata", {}),
@@ -360,6 +361,44 @@ async def metrics_endpoint():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/agents/reload")
+async def reload_agents():
+    """
+    Reload agent configuration without restarting the orchestrator.
+
+    This endpoint allows you to:
+    - Add new agents by updating config/agents.yaml
+    - Remove agents by disabling them in config
+    - Update agent configurations
+    - All without restarting the server!
+
+    Returns:
+        JSON with reload results including:
+        - success: Whether reload succeeded
+        - summary: Counts of registered/skipped/failed agents
+        - changes: What was added/removed/updated
+        - agents: Details of registered/skipped/failed agents
+    """
+    if not orchestrator:
+        raise HTTPException(status_code=503, detail="Orchestrator not initialized")
+
+    logger.info("📡 Received agent reload request")
+
+    try:
+        result = await orchestrator.reload_agents()
+
+        if result.get("success"):
+            logger.info(f"✅ Agents reloaded successfully: {result['summary']}")
+            return JSONResponse(content=result, status_code=200)
+        else:
+            logger.error(f"❌ Agent reload failed: {result.get('error')}")
+            return JSONResponse(content=result, status_code=500)
+
+    except Exception as e:
+        logger.error(f"❌ Unexpected error during agent reload: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/")
 async def root():
     """Root endpoint with API information."""
@@ -388,11 +427,13 @@ async def root():
             "health": "GET /health - Health check",
             "stats": "GET /stats - Statistics",
             "metrics": "GET /metrics - Prometheus metrics",
+            "reload": "POST /agents/reload - Reload agent configuration",
             "docs": "GET /docs - Interactive API documentation",
         },
         "features": {
             "streaming": "Server-Sent Events (SSE) for real-time updates",
             "observability": "Full metrics, tracing, and logging",
+            "hot_reload": "Dynamic agent reloading without restart",
             "authentication": os.getenv("ORCHESTRATOR_REQUIRE_AUTH", "false") == "true",
         },
     }

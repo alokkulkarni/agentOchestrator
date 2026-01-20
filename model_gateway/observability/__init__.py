@@ -9,7 +9,7 @@ from .tracing import init_tracing, get_tracer
 from .logging_config import setup_structured_logging
 from .sanitization import sanitize_content
 from .cost_tracking import cost_tracker
-from .rate_limiting import rate_limiter
+from .rate_limiting import rate_limiter, init_rate_limiting
 
 __all__ = [
     "metrics_manager",
@@ -19,4 +19,5 @@ __all__ = [
     "sanitize_content",
     "cost_tracker",
     "rate_limiter",
+    "init_rate_limiting",
 ]

@@ -29,6 +29,7 @@ class QueryResponse(BaseModel):
 
     success: bool = Field(..., description="Whether the query was successful")
     data: Dict[str, Any] = Field(..., description="Response data from agents")
+    formatted_text: Optional[str] = Field(None, description="User-friendly formatted text for display")
     request_id: str = Field(..., description="Unique request ID (correlation ID)")
     session_id: Optional[str] = Field(None, description="Session ID if provided")
     metadata: Optional[Dict[str, Any]] = Field(None, description="Execution metadata")

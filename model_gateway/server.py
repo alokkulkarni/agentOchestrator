@@ -12,9 +12,18 @@ Provides unified API for accessing multiple AI providers with:
 """
 
 import logging
+import os
 import time
 import sys
+from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+# Load environment variables from .env file
+from dotenv import load_dotenv
+
+# Load .env from project root (parent of model_gateway/)
+env_path = Path(__file__).parent.parent / ".env"
+load_dotenv(dotenv_path=env_path, override=False)  # Don't override existing env vars
 
 from fastapi import FastAPI, HTTPException, Header, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -63,6 +72,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add observability middleware (must be added before app starts)
+app.add_middleware(CorrelationIDMiddleware, generate_if_missing=True)
+app.add_middleware(SessionTrackingMiddleware, generate_if_missing=True)
+app.add_middleware(RequestLoggingMiddleware, sanitize_logs=True)
+app.add_middleware(MetricsMiddleware)
 
 # Global state
 gateway_config = None
@@ -162,17 +177,6 @@ async def startup_event():
     logger.info(
         "✅ Rate limiting initialized", enabled=rate_limit_enabled, limits=rate_limit_default
     )
-
-    # Add observability middleware
-    app.add_middleware(MetricsMiddleware)
-    app.add_middleware(RequestLoggingMiddleware, sanitize_logs=True)
-    session_tracking_middleware = SessionTrackingMiddleware(app)
-    app.add_middleware(
-        lambda app: session_tracking_middleware.__class__(
-            app, generate_if_missing=True
-        )
-    )
-    app.add_middleware(CorrelationIDMiddleware, generate_if_missing=True)
 
     # Set gateway info for metrics
     metrics_manager.set_gateway_info(

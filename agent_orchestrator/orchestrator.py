@@ -26,6 +26,7 @@ from .config import (
     load_all_configs,
     OrchestratorConfig,
 )
+from .formatting import ResponseFormatter
 from .observability import (
     orchestrator_metrics,
     metrics_server,
@@ -206,6 +207,9 @@ class Orchestrator:
             log_to_console=getattr(self.config, 'log_queries_to_console', False),
         )
 
+        # Initialize response formatter for user-friendly output
+        self.response_formatter = ResponseFormatter()
+
         # Execution context
         self._execution_history: List[Dict[str, Any]] = []
 
@@ -297,6 +301,109 @@ class Orchestrator:
             f"Orchestrator initialization complete: "
             f"{self.agent_registry.count()} agents registered"
         )
+
+    async def reload_agents(self) -> Dict[str, Any]:
+        """
+        Reload agent configuration and re-register agents without restarting the orchestrator.
+
+        This allows adding/removing/updating agents dynamically by:
+        1. Re-loading configuration from agents.yaml
+        2. Cleaning up existing agents
+        3. Re-registering agents from updated config
+
+        Returns:
+            Dict with reload results including counts and any errors
+        """
+        logger.info("🔄 Reloading agents from configuration...")
+
+        try:
+            # Re-load configuration
+            from .config import load_agents_config
+            agents_config_path = os.path.join(
+                os.path.dirname(self.config_path),
+                "config/agents.yaml"
+            )
+
+            old_count = self.agent_registry.count()
+            old_agents = list(self.agent_registry.list_agents().keys())
+
+            # Clean up existing agents
+            await self.agent_registry.cleanup_all()
+            logger.info(f"Cleaned up {old_count} existing agents")
+
+            # Reload config
+            self.agents_config = load_agents_config(agents_config_path)
+            logger.info(f"Reloaded configuration with {len(self.agents_config.agents)} agents")
+
+            # Re-register agents
+            registered = []
+            skipped = []
+            failed = []
+
+            for agent_config in self.agents_config.agents:
+                if not agent_config.enabled:
+                    skipped.append(agent_config.name)
+                    logger.info(f"Skipping disabled agent: {agent_config.name}")
+                    continue
+
+                try:
+                    agent = self._create_agent(agent_config)
+                    await self.agent_registry.register(agent, initialize=True)
+                    registered.append(agent_config.name)
+                    logger.info(f"Registered agent: {agent_config.name}")
+                except Exception as e:
+                    failed.append({
+                        "name": agent_config.name,
+                        "error": str(e)
+                    })
+                    logger.error(f"Failed to register agent {agent_config.name}: {e}")
+
+            new_count = self.agent_registry.count()
+            new_agents = list(self.agent_registry.list_agents().keys())
+
+            # Calculate changes
+            added = [a for a in new_agents if a not in old_agents]
+            removed = [a for a in old_agents if a not in new_agents]
+
+            result = {
+                "success": True,
+                "message": f"Agents reloaded successfully",
+                "summary": {
+                    "previous_count": old_count,
+                    "current_count": new_count,
+                    "registered": len(registered),
+                    "skipped": len(skipped),
+                    "failed": len(failed),
+                },
+                "changes": {
+                    "added": added,
+                    "removed": removed,
+                    "updated": [a for a in new_agents if a in old_agents and a not in added],
+                },
+                "agents": {
+                    "registered": registered,
+                    "skipped": skipped,
+                    "failed": failed,
+                },
+            }
+
+            logger.info(
+                f"✅ Agent reload complete: {new_count} agents active "
+                f"(+{len(added)}, -{len(removed)})"
+            )
+
+            # Update metrics
+            orchestrator_metrics.registered_agents.set(new_count)
+
+            return result
+
+        except Exception as e:
+            logger.error(f"❌ Failed to reload agents: {e}", exc_info=True)
+            return {
+                "success": False,
+                "error": str(e),
+                "error_type": type(e).__name__,
+            }
 
     def _create_agent(self, config: AgentConfig):
         """
@@ -424,6 +531,7 @@ class Orchestrator:
 
                             # Record metrics
                             orchestrator_metrics.queries_failed.labels(
+                                error_type="SecurityError",
                                 reasoning_mode=self.config.reasoning_mode
                             ).inc()
 
@@ -446,6 +554,7 @@ class Orchestrator:
 
                     # Record metrics
                     orchestrator_metrics.queries_failed.labels(
+                        error_type="ReasoningError",
                         reasoning_mode=self.config.reasoning_mode
                     ).inc()
 
@@ -535,6 +644,7 @@ class Orchestrator:
                     reasoning_mode=self.config.reasoning_mode
                 ).inc()
                 orchestrator_metrics.queries_failed.labels(
+                    error_type=type(e).__name__,
                     reasoning_mode=self.config.reasoning_mode
                 ).inc()
                 orchestrator_metrics.query_duration.labels(
@@ -593,9 +703,11 @@ class Orchestrator:
                 reasoning_mode=self.config.reasoning_mode,
                 method=reasoning_result.method
             ).inc()
-            orchestrator_metrics.reasoning_confidence.observe(reasoning_result.confidence)
+            orchestrator_metrics.reasoning_confidence.labels(
+                method=reasoning_result.method
+            ).observe(reasoning_result.confidence)
             orchestrator_metrics.reasoning_duration.labels(
-                reasoning_mode=self.config.reasoning_mode
+                method=reasoning_result.method
             ).observe(duration_seconds)
 
             # Add attributes to span
@@ -763,12 +875,12 @@ class Orchestrator:
 
                     # Record agent metrics
                     status = "success" if response.success else "failed"
-                    orchestrator_metrics.agent_calls.labels(
-                        agent=response.agent_name,
+                    orchestrator_metrics.agent_calls_total.labels(
+                        agent_name=response.agent_name,
                         status=status
                     ).inc()
                     orchestrator_metrics.agent_duration.labels(
-                        agent=response.agent_name
+                        agent_name=response.agent_name
                     ).observe(response.execution_time)
 
             # Schema validation (existing)
@@ -807,8 +919,8 @@ class Orchestrator:
             )
 
             # Record validation metrics
-            status = "passed" if validation_result.is_valid else "failed"
-            orchestrator_metrics.validation_checks.labels(status=status).inc()
+            result = "valid" if validation_result.is_valid else "invalid"
+            orchestrator_metrics.validation_checks.labels(result=result).inc()
             orchestrator_metrics.validation_confidence.observe(validation_result.confidence_score)
             if validation_result.hallucination_detected:
                 orchestrator_metrics.hallucination_detected.inc()
@@ -820,6 +932,12 @@ class Orchestrator:
                 )
                 # Remove confidence score from output (don't send to user)
                 # It's only in the logs
+
+                # Add formatted text for user-friendly display
+                agent_data = output.get("data", {})
+                formatted_text = self.response_formatter.format_response(agent_data)
+                output["formatted_text"] = formatted_text
+
                 return output
 
             # Validation failed
@@ -845,7 +963,7 @@ class Orchestrator:
                 # Record retry metrics
                 for agent_name in reasoning_result.agents:
                     orchestrator_metrics.agent_retries.labels(
-                        agent=agent_name,
+                        agent_name=agent_name,
                         reason="validation_failed"
                     ).inc()
 
@@ -869,6 +987,11 @@ class Orchestrator:
                     "issues": validation_result.issues,
                     "hallucination_detected": validation_result.hallucination_detected,
                 }
+
+                # Add formatted text for user-friendly display
+                agent_data = output.get("data", {})
+                formatted_text = self.response_formatter.format_response(agent_data)
+                output["formatted_text"] = formatted_text
 
                 return output
 
@@ -941,9 +1064,9 @@ class Orchestrator:
             if self.circuit_breaker.is_open(agent.name):
                 circuit_breaker_stats[agent.name] = "open"
                 # Update circuit breaker metric
-                orchestrator_metrics.circuit_breaker_open.labels(agent=agent.name).set(1)
+                orchestrator_metrics.circuit_breaker_open.labels(agent_name=agent.name).set(1)
             else:
-                orchestrator_metrics.circuit_breaker_open.labels(agent=agent.name).set(0)
+                orchestrator_metrics.circuit_breaker_open.labels(agent_name=agent.name).set(0)
 
         if circuit_breaker_stats:
             stats["circuit_breakers"] = circuit_breaker_stats
