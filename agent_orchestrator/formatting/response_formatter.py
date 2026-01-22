@@ -53,6 +53,14 @@ class ResponseFormatter:
         elif 'processed_data' in agent_data or 'aggregation' in agent_data:
             return self._format_data_processor(agent_data)
 
+        # Tech insights agent
+        elif 'insights' in agent_data and 'total_insights' in agent_data:
+            return self._format_tech_insights(agent_data)
+
+        # Planning agent
+        elif 'plan' in agent_data or 'status' in agent_data and agent_data.get('status') in ['plan_created', 'needs_clarification']:
+            return self._format_planning(agent_data)
+
         # Generic fallback
         else:
             return self._format_generic(agent_name, agent_data)
@@ -202,6 +210,256 @@ class ResponseFormatter:
             lines.append(f"\n✓ Operation: {data['operation']}")
 
         return "\n".join(lines) if lines else self._format_generic("data_processor", data)
+
+    def _format_tech_insights(self, data: Dict[str, Any]) -> str:
+        """Format tech insights data into readable text."""
+        lines = []
+
+        # Header
+        total = data.get('total_insights', 0)
+        filters = data.get('filters', {})
+        audience = filters.get('audience', 'both')
+        category = filters.get('category')
+
+        lines.append(f"💡 Top {total} Software Engineering Insights")
+        if category:
+            lines.append(f"   Category: {category.upper()}")
+        lines.append(f"   Audience: {audience.title()}")
+        lines.append("")
+        lines.append("=" * 80)
+        lines.append("")
+
+        # Display each insight
+        insights = data.get('insights', [])
+        for insight in insights:
+            rank = insight.get('rank', '?')
+            title = insight.get('title', 'No title')
+            category = insight.get('category', 'general')
+            impact = insight.get('impact', 'medium')
+            adoption = insight.get('adoption', 'unknown')
+            source = insight.get('source', 'N/A')
+
+            # Title with rank and metadata
+            lines.append(f"{rank}. {title}")
+            lines.append(f"   📂 Category: {category.upper()} | 🎯 Impact: {impact.upper()} | 📈 Adoption: {adoption.upper()}")
+            lines.append(f"   📚 Source: {source}")
+            lines.append("")
+
+            # Show perspectives based on audience filter
+            if audience == 'both':
+                # Show both technical and non-technical
+                technical = insight.get('technical', '')
+                non_technical = insight.get('non_technical', '')
+
+                if technical:
+                    lines.append("   👨‍💻 TECHNICAL PERSPECTIVE:")
+                    # Wrap long lines
+                    for line in self._wrap_text(technical, width=75, indent=6):
+                        lines.append(line)
+                    lines.append("")
+
+                if non_technical:
+                    lines.append("   👥 NON-TECHNICAL PERSPECTIVE:")
+                    for line in self._wrap_text(non_technical, width=75, indent=6):
+                        lines.append(line)
+                    lines.append("")
+            else:
+                # Show single perspective
+                insight_text = insight.get('insight', '')
+                if insight_text:
+                    for line in self._wrap_text(insight_text, width=75, indent=3):
+                        lines.append(line)
+                    lines.append("")
+
+            lines.append("-" * 80)
+            lines.append("")
+
+        # Footer with metadata
+        metadata = data.get('metadata', {})
+        if metadata:
+            lines.append("")
+            lines.append(f"ℹ️  Source: {metadata.get('source', 'Unknown')}")
+            lines.append(f"   Version: {metadata.get('version', 'N/A')}")
+            lines.append(f"   Update Frequency: {metadata.get('update_frequency', 'N/A')}")
+
+        return "\n".join(lines)
+
+    def _wrap_text(self, text: str, width: int = 75, indent: int = 3) -> list:
+        """Wrap text to specified width with indentation."""
+        words = text.split()
+        lines = []
+        current_line = " " * indent
+
+        for word in words:
+            if len(current_line) + len(word) + 1 <= width:
+                current_line += word + " "
+            else:
+                lines.append(current_line.rstrip())
+                current_line = " " * indent + word + " "
+
+        if current_line.strip():
+            lines.append(current_line.rstrip())
+
+        return lines
+
+    def _format_planning(self, data: Dict[str, Any]) -> str:
+        """Format planning agent results into readable text."""
+        lines = []
+
+        status = data.get('status', 'unknown')
+
+        # Handle clarification needed
+        if status == 'needs_clarification':
+            lines.append("📋 Planning Agent - Additional Information Needed")
+            lines.append("")
+            lines.append("=" * 80)
+            lines.append("")
+
+            # Current understanding
+            if 'partial_understanding' in data:
+                understanding = data['partial_understanding']
+                lines.append("✅ Current Understanding:")
+                if 'app_purpose' in understanding:
+                    lines.append(f"   Purpose: {understanding['app_purpose']}")
+                if 'target_users' in understanding:
+                    lines.append(f"   Users: {understanding['target_users']}")
+                if 'core_features' in understanding:
+                    lines.append(f"   Features: {', '.join(understanding['core_features'][:3])}")
+                    if len(understanding['core_features']) > 3:
+                        lines.append(f"              ...and {len(understanding['core_features']) - 3} more")
+                lines.append("")
+
+            # Missing information
+            if 'missing_info' in data and data['missing_info']:
+                lines.append("⚠️  Missing Critical Information:")
+                for info in data['missing_info']:
+                    lines.append(f"   • {info}")
+                lines.append("")
+
+            # Questions for user
+            if 'questions' in data and data['questions']:
+                lines.append("❓ Please provide more details:")
+                for i, question in enumerate(data['questions'], 1):
+                    lines.append(f"   {i}. {question}")
+                lines.append("")
+
+            lines.append("💡 Tip: Provide more details about the missing information above,")
+            lines.append("   and I'll create a comprehensive plan for you.")
+
+            return "\n".join(lines)
+
+        # Handle successful plan creation
+        elif status == 'plan_created':
+            lines.append("📋 Application Plan Created Successfully")
+            lines.append("")
+            lines.append("=" * 80)
+            lines.append("")
+
+            # Metadata
+            if 'metadata' in data:
+                meta = data['metadata']
+                lines.append("📊 Plan Summary:")
+                lines.append(f"   • Application Type: {meta.get('app_type', 'N/A')}")
+                lines.append(f"   • Total Epics: {meta.get('epics_count', 0)}")
+                lines.append(f"   • Total User Stories: {meta.get('total_stories', 0)}")
+                lines.append(f"   • Created: {meta.get('created_at', 'N/A')}")
+                lines.append("")
+
+            # Document location
+            if 'document_path' in data:
+                lines.append("📁 Plan Document:")
+                lines.append(f"   {data['document_path']}")
+                lines.append("")
+
+            # Validation results
+            if 'validation' in data:
+                validation = data['validation']
+                confidence = validation.get('confidence', 0.0)
+                lines.append(f"✅ Validation: {confidence:.1%} confidence")
+
+                if validation.get('quality_assessment'):
+                    qa = validation['quality_assessment']
+                    lines.append(f"   • Completeness: {qa.get('completeness', 'N/A')}")
+                    lines.append(f"   • Clarity: {qa.get('clarity', 'N/A')}")
+                    lines.append(f"   • Actionability: {qa.get('actionability', 'N/A')}")
+
+                if validation.get('issues'):
+                    lines.append("")
+                    lines.append("   ⚠️  Issues identified:")
+                    for issue in validation['issues'][:3]:
+                        lines.append(f"      - {issue}")
+                    if len(validation['issues']) > 3:
+                        lines.append(f"      ...and {len(validation['issues']) - 3} more (see document)")
+
+                lines.append("")
+
+            # Show plan overview
+            if 'plan' in data:
+                plan = data['plan']
+
+                # Vision
+                if 'vision' in plan:
+                    lines.append("🎯 Vision:")
+                    for line in self._wrap_text(plan['vision'], width=75, indent=3):
+                        lines.append(line)
+                    lines.append("")
+
+                # Objectives
+                if 'objectives' in plan and plan['objectives']:
+                    lines.append("🎯 Key Objectives:")
+                    for obj in plan['objectives'][:5]:
+                        lines.append(f"   • {obj}")
+                    if len(plan['objectives']) > 5:
+                        lines.append(f"   ...and {len(plan['objectives']) - 5} more")
+                    lines.append("")
+
+                # Epics overview
+                if 'epics' in plan:
+                    lines.append(f"📚 Epics ({len(plan['epics'])} total):")
+                    lines.append("")
+
+                    for epic in plan['epics'][:3]:  # Show first 3 epics
+                        epic_id = epic.get('id', 'N/A')
+                        title = epic.get('title', 'Untitled')
+                        priority = epic.get('priority', 'Medium')
+                        story_count = len(epic.get('user_stories', []))
+
+                        lines.append(f"   {epic_id}: {title}")
+                        lines.append(f"   Priority: {priority} | Stories: {story_count}")
+
+                        # Show first 2 user stories
+                        for story in epic.get('user_stories', [])[:2]:
+                            story_id = story.get('id', 'N/A')
+                            story_title = story.get('title', 'Untitled')
+                            lines.append(f"      • {story_id}: {story_title}")
+
+                        if story_count > 2:
+                            lines.append(f"      ...and {story_count - 2} more stories")
+                        lines.append("")
+
+                    if len(plan['epics']) > 3:
+                        lines.append(f"   ...and {len(plan['epics']) - 3} more epics")
+                        lines.append("")
+
+                # Risks
+                if 'risks' in plan and plan['risks']:
+                    lines.append("⚠️  Key Risks:")
+                    for risk in plan['risks'][:3]:
+                        lines.append(f"   • {risk.get('description', 'N/A')} (Impact: {risk.get('impact', 'N/A')})")
+                    if len(plan['risks']) > 3:
+                        lines.append(f"   ...and {len(plan['risks']) - 3} more risks")
+                    lines.append("")
+
+            lines.append("=" * 80)
+            lines.append("")
+            lines.append("📄 Full plan with detailed user stories, acceptance criteria,")
+            lines.append("   and technical notes is saved in the document above.")
+
+            return "\n".join(lines)
+
+        # Generic fallback for unknown status
+        else:
+            return self._format_generic("planning", data)
 
     def _format_generic(self, agent_name: str, data: Dict[str, Any]) -> str:
         """Generic formatter for unknown agent types."""

@@ -372,6 +372,176 @@ agents:
       note: "Uses mock data if OPENWEATHER_API_KEY not set"
 
   # ============================================================================
+  # TECH INSIGHTS AGENT - AI-powered software engineering trends analysis
+  # ============================================================================
+  - name: "tech_insights"
+    type: "direct"
+    direct_tool:
+      module: "examples.sample_tech_insights"
+      function: "get_tech_insights"
+      is_async: false
+
+    capabilities:
+      - "insights"
+      - "trends"
+      - "technology"
+      - "software-engineering"
+      - "ai"
+      - "ml"
+      - "programming"
+      - "tools"
+      - "education"
+
+    # AI-powered role with validation and quality checks
+    role:
+      name: "tech-advisor-ai"
+      description: "Provides industry-wide technology trends, software engineering insights, and technology landscape analysis. NOT for project-specific technology recommendations - use planning agent for that."
+      allowed_operations:
+        - "get_insights"
+        - "generate_insights_with_ai"
+        - "validate_insights"
+        - "filter_by_category"
+        - "filter_by_audience"
+      denied_operations:
+        - "modify_curated_insights"
+        - "delete_insights"
+        - "override_validation"
+      max_execution_time: 60  # AI generation takes longer
+      max_input_size: 5000
+      require_approval: false
+      guardrails:
+        # Content guardrails
+        min_insights: 10
+        max_insights: 20
+        required_categories: ["ai", "languages", "tools", "ml"]
+        required_fields: ["rank", "title", "category", "technical", "non_technical", "impact", "adoption", "source"]
+
+        # Quality guardrails
+        min_technical_length: 100
+        max_technical_length: 800
+        min_non_technical_length: 50
+        max_non_technical_length: 600
+
+        # Validation guardrails
+        validate_before_response: true
+        min_quality_score: 0.8
+        fallback_on_validation_failure: true
+
+        # Content quality
+        require_specific_examples: true
+        require_factual_data: true
+        no_speculation: true
+        include_both_perspectives: true
+
+    constraints:
+      max_retries: 2
+      timeout: 60  # AI calls need more time
+      rate_limit: 10  # Lower rate limit due to AI costs
+      require_validation: true  # MUST validate AI output
+      allowed_input_fields:
+        - "category"
+        - "audience"
+        - "query"
+        - "refresh"  # Allow AI refresh
+        - "gateway_url"
+      denied_input_fields:
+        - "admin"
+        - "override"
+        - "bypass_validation"
+      output_sanitization: false  # Educational content, no sanitization needed
+      log_level: "INFO"
+
+    fallback: null  # Has internal fallback to curated insights
+    enabled: true
+    metadata:
+      description: "Provides industry technology trends and software engineering insights - NOT for project-specific tech recommendations"
+      version: "2026.1"
+      categories: ["ai", "ml", "languages", "tools"]
+      update_frequency: "on-demand with AI, monthly for curated"
+      ai_powered: true
+      model_gateway_required: true
+      validation_enabled: true
+      fallback_strategy: "curated insights on validation failure"
+
+  # ============================================================================
+  # PLANNING AGENT - AI-powered application planning with epics and user stories
+  # ============================================================================
+  - name: "planning"
+    type: "direct"
+    direct_tool:
+      module: "examples.sample_planning_agent"
+      function: "create_application_plan"
+      is_async: false
+
+    capabilities:
+      - "planning"
+      - "requirements"
+      - "user-stories"
+      - "epics"
+      - "project-planning"
+      - "application-design"
+      - "product-management"
+
+    # Strict role for planning with validation
+    role:
+      name: "application-planner"
+      description: "Creates detailed application plans with epics and user stories, validates against requirements"
+      allowed_operations:
+        - "plan_application"
+        - "validate_requirements"
+        - "generate_epics"
+        - "create_user_stories"
+        - "save_plan_document"
+      denied_operations:
+        - "execute_code"
+        - "deploy"
+        - "modify_existing_plans"
+        - "delete_files"
+      max_execution_time: 120  # 2 minutes for AI planning
+      max_input_size: 50000  # 50KB max requirements
+      require_approval: false
+      guardrails:
+        require_requirements: true
+        validate_before_response: true
+        no_hallucination: true
+        ask_clarification_when_unclear: true
+        technology_agnostic: true
+        save_audit_trail: true
+        max_epics: 10
+        max_stories_per_epic: 15
+        min_acceptance_criteria: 2
+
+    constraints:
+      max_retries: 2
+      timeout: 120  # AI planning can take time
+      rate_limit: 10  # 10 plans per minute
+      require_validation: true  # Must validate plan against requirements
+      allowed_input_fields:
+        - "requirements"
+        - "query"
+        - "app_type"
+        - "clarifications"
+        - "gateway_url"
+      denied_input_fields:
+        - "code"
+        - "script"
+        - "command"
+        - "override"
+      output_sanitization: true
+      log_level: "INFO"
+
+    fallback: null
+    enabled: true
+    metadata:
+      description: "AI-powered planning agent that creates detailed application plans with epics and user stories"
+      version: "1.0.0"
+      output_format: "markdown document"
+      validation: "AI-validated against requirements"
+      storage: "application_plans/ directory"
+      interactive: true  # Can ask for clarification
+      model_dependency: "Requires model gateway"
+
+  # ============================================================================
   # WEATHER AGENT (MCP) - Example MCP server with weather data
   # ============================================================================
   # NOTE: Disabled by default - requires MCP server running

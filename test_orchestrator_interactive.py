@@ -306,6 +306,35 @@ def format_result(result: Dict[str, Any]) -> str:
     """Format orchestrator result for display."""
     output = []
 
+    # Check if formatted_text is available (preferred)
+    if 'formatted_text' in result and result['formatted_text']:
+        # Use the pre-formatted text from ResponseFormatter
+        output.append(f"\n{Colors.OKGREEN}{Colors.BOLD}✅ Response:{Colors.ENDC}\n")
+        output.append(result['formatted_text'])
+
+        # Still show metadata
+        metadata = result.get('metadata', result.get('_metadata', {}))
+        if metadata:
+            output.append(f"\n{Colors.OKCYAN}{'─' * 70}{Colors.ENDC}")
+
+            # Agent trail
+            agent_trail = metadata.get('agent_trail', [])
+            if agent_trail:
+                output.append(f"{Colors.OKCYAN}Agents Used:{Colors.ENDC} {' → '.join(agent_trail)}")
+
+            # Execution time
+            exec_time = metadata.get('total_execution_time', metadata.get('duration_seconds', 0))
+            if exec_time:
+                output.append(f"{Colors.OKCYAN}Execution Time:{Colors.ENDC} {exec_time:.3f}s")
+
+            # Reasoning
+            reasoning = metadata.get('reasoning', {})
+            if reasoning:
+                output.append(f"{Colors.OKCYAN}Reasoning:{Colors.ENDC} {reasoning.get('method', 'N/A')} (confidence: {reasoning.get('confidence', 0):.2f})")
+
+        return '\n'.join(output)
+
+    # Fallback to raw data formatting if no formatted_text
     # Success status
     success = result.get('success', False)
     status_color = Colors.OKGREEN if success else Colors.FAIL

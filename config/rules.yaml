@@ -97,6 +97,138 @@ rules:
     confidence: 0.85
     enabled: true
 
+  # Rule for application planning queries
+  - name: "planning_queries"
+    priority: 98
+    conditions:
+      - field: "query"
+        operator: "contains"
+        value: "plan"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "create a plan"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "draft a plan"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "requirements"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "user stories"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "user story"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "epics"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "epic"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "application plan"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "project plan"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "build an app"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "build a web"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "build a mobile"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "create an app"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "create a website"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "design application"
+        case_sensitive: false
+      - field: "requirements"
+        operator: "exists"
+        value: null
+        case_sensitive: false
+    logic: "or"
+    target_agents:
+      - "planning"
+    confidence: 0.95
+    enabled: true
+
+  # Rule for tech insights queries
+  - name: "tech_insights_queries"
+    priority: 92
+    conditions:
+      - field: "query"
+        operator: "contains"
+        value: "insights"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "trends"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "top 20"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "software engineering"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "tech trends"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "technology trends"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "programming trends"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "ai trends"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "ml trends"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "latest in tech"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "what's new"
+        case_sensitive: false
+    logic: "or"
+    target_agents:
+      - "tech_insights"
+    confidence: 0.92
+    enabled: true
+
   # Rule for weather-related queries
   - name: "weather_queries"
     priority: 85

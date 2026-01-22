@@ -816,9 +816,9 @@ class Orchestrator:
             per_agent_input = {}
             for idx, inst in enumerate(agent_instances):
                 agent_input = {**input_data, **inst["params"]}
-                # Use unique key for each instance
-                unique_key = f"{inst['agent'].name}_{idx}"
-                per_agent_input[unique_key] = agent_input
+                # Use agent name as key (retry handler looks up by agent.name)
+                # For multi-instance calls, each instance is a separate agent in the list
+                per_agent_input[inst['agent'].name] = agent_input
 
             responses = await self.retry_handler.call_multiple_with_retry(
                 agents=agents,
