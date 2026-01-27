@@ -1210,10 +1210,10 @@ class Orchestrator:
 
                 # Add formatted text for user-friendly display
                 agent_data = output.get("data", {})
-                formatted_text = self.response_formatter.format_response(agent_data)
+                query_text = input_data.get("query", str(input_data))
+                formatted_text = self.response_formatter.format_response(agent_data, query_text)
                 
                 # Wrap with conversational elements
-                query_text = input_data.get("query", str(input_data))
                 session_id = get_session_id()  # Get from context
                 formatted_text = self.conversational_wrapper.wrap_response(
                     original_response=formatted_text,
@@ -1276,10 +1276,10 @@ class Orchestrator:
 
                 # Add formatted text for user-friendly display
                 agent_data = output.get("data", {})
-                formatted_text = self.response_formatter.format_response(agent_data)
+                query_text = input_data.get("query", str(input_data))
+                formatted_text = self.response_formatter.format_response(agent_data, query_text)
                 
                 # Wrap with conversational elements (treating as partial error)
-                query_text = input_data.get("query", str(input_data))
                 session_id = get_session_id()  # Get from context
                 formatted_text = self.conversational_wrapper.wrap_response(
                     original_response=formatted_text,

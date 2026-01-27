@@ -534,15 +534,16 @@ agents:
       log_level: "INFO"
 
     fallback: null
-    enabled: true
+    enabled: false  # Disabled - orchestrator handles planning internally
     metadata:
-      description: "AI-powered planning agent that creates detailed application plans with epics and user stories"
+      description: "AI-powered planning agent that creates detailed application plans with epics and user stories - DISABLED: Orchestrator synthesizes responses internally"
       version: "1.0.0"
       output_format: "markdown document"
       validation: "AI-validated against requirements"
       storage: "application_plans/ directory"
       interactive: true  # Can ask for clarification
       model_dependency: "Requires model gateway"
+      note: "This agent is disabled because planning/synthesis should happen internally in the orchestrator, not as an external agent call"
 
   # ============================================================================
   # WEATHER AGENT (MCP) - Example MCP server with weather data

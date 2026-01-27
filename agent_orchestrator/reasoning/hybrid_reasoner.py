@@ -170,6 +170,11 @@ class HybridReasoner:
 
         # Use best match
         best_match = rule_matches[0]
+        
+        # Check if rule explicitly rejects the query (empty target_agents)
+        if not best_match.target_agents:
+            logger.info(f"Rule '{best_match.rule_name}' explicitly rejects query (unsupported)")
+            return None
 
         return ReasoningResult(
             agents=best_match.target_agents,
@@ -249,6 +254,11 @@ class HybridReasoner:
                 f"Rule matched: '{best_match.rule_name}' (confidence={best_match.confidence:.2f})"
             )
             
+            # Check if rule explicitly rejects the query (empty target_agents)
+            if not best_match.target_agents:
+                logger.info(f"Rule '{best_match.rule_name}' explicitly rejects query (unsupported)")
+                return None
+            
             # If AI agrees with rules or rules have very high confidence, prefer rule result
             if ai_plan and best_match.confidence >= 0.95:
                 if set(ai_plan.agents) == set(best_match.target_agents):
@@ -289,6 +299,12 @@ class HybridReasoner:
         # Step 4: Fallback to rules if AI failed
         if rule_matches:
             best_match = rule_matches[0]
+            
+            # Check if rule explicitly rejects the query (empty target_agents)
+            if not best_match.target_agents:
+                logger.info(f"Rule '{best_match.rule_name}' explicitly rejects query (unsupported)")
+                return None
+            
             logger.info("Falling back to rule match")
             return ReasoningResult(
                 agents=best_match.target_agents,

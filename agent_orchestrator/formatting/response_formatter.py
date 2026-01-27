@@ -10,18 +10,28 @@ from typing import Any, Dict, List
 class ResponseFormatter:
     """Formats agent responses into human-readable text."""
 
-    def format_response(self, data: Dict[str, Any]) -> str:
+    def __init__(self):
+        """Initialize the response formatter."""
+        self.trip_keywords = ["trip", "travel", "route", "itinerary", "journey", "drive from", "points of interest"]
+        self.process_keywords = ["steps", "process", "how to", "guide", "procedure", "what do i need"]
+
+    def format_response(self, data: Dict[str, Any], original_query: str = "") -> str:
         """
         Format agent responses into user-friendly text.
 
         Args:
             data: Dictionary of agent responses (agent_name -> agent_data)
+            original_query: The original user query (used for context-aware synthesis)
 
         Returns:
             Formatted text suitable for direct display to users
         """
         if not data:
             return "No results available."
+
+        # Check if this needs orchestrator synthesis (not single-agent response)
+        if self._needs_synthesis(data, original_query):
+            return self._synthesize_response(data, original_query)
 
         formatted_parts = []
 
@@ -31,6 +41,311 @@ class ResponseFormatter:
                 formatted_parts.append(formatted)
 
         return "\n\n".join(formatted_parts) if formatted_parts else "No results available."
+
+    def _needs_synthesis(self, data: Dict[str, Any], query: str) -> bool:
+        """
+        Check if this query needs orchestrator synthesis rather than just formatting agent outputs.
+        
+        Synthesis is needed when:
+        - Query asks for process/steps/how-to AND we have search results
+        - Query is about trip planning AND we have search results
+        - Multiple search agents were called (indicates complex information gathering)
+        """
+        if not query:
+            return False
+            
+        # Has search results from multiple search agents or complex query
+        has_search = any(agent in ['search', 'tavily_search'] for agent in data.keys())
+        if not has_search:
+            return False
+            
+        query_lower = query.lower()
+        
+        # Process/steps queries
+        is_process_query = any(keyword in query_lower for keyword in self.process_keywords)
+        
+        # Trip planning queries
+        is_trip_query = any(keyword in query_lower for keyword in self.trip_keywords)
+        
+        return is_process_query or is_trip_query
+
+    def _synthesize_response(self, data: Dict[str, Any], query: str) -> str:
+        """
+        Synthesize a coherent response from search results based on query type.
+        
+        This is the orchestrator's internal synthesis - it combines information
+        from multiple agents into a structured, coherent answer.
+        """
+        query_lower = query.lower()
+        
+        # Detect query type
+        if any(keyword in query_lower for keyword in self.trip_keywords):
+            return self._synthesize_trip_plan(data, query)
+        elif any(keyword in query_lower for keyword in self.process_keywords):
+            return self._synthesize_process_guide(data, query)
+        else:
+            # General information synthesis
+            return self._synthesize_general_info(data, query)
+
+    def _is_result_relevant(self, result: Dict[str, Any], query: str) -> bool:
+        """
+        Check if a search result is relevant to the query.
+        Filters out results that are clearly unrelated (e.g., code files, programming docs).
+        """
+        query_lower = query.lower()
+        
+        # Get result content
+        title = result.get('title', '').lower()
+        content = result.get('content', result.get('snippet', '')).lower()
+        url = result.get('url', '').lower()
+        
+        # Check if query is about programming/code
+        is_programming_query = any(term in query_lower for term in 
+            ['python', 'javascript', 'programming', 'code', 'software', 'function', 'api'])
+        
+        if not is_programming_query:
+            # Filter out programming/code-related results
+            programming_terms = [
+                'python', 'javascript', 'programming', 'async', 'await',
+                'function', 'class', 'import', 'asyncio', 'syntax',
+                'language', 'library', 'framework'
+            ]
+            
+            # Count programming terms in result
+            prog_count = sum(1 for term in programming_terms if term in title or term in content[:300])
+            
+            # If result is heavily about programming, filter it out
+            if prog_count >= 2:
+                return False
+        
+        # Prefer results with proper URLs (web resources, not local files)
+        if url and not url.startswith(('http://', 'https://')):
+            return False
+        
+        # Check for keyword overlap
+        query_words = set(word for word in query_lower.split() if len(word) > 3)
+        result_text = (title + ' ' + content[:200]).lower()
+        
+        # Count matching words
+        matches = sum(1 for word in query_words if word in result_text)
+        
+        # Need at least 2 matching words or very relevant title
+        return matches >= 2 or any(word in title for word in query_words)
+
+    def _synthesize_process_guide(self, data: Dict[str, Any], query: str) -> str:
+        """
+        Synthesize a process/steps guide from search results.
+        
+        Examples:
+        - "steps to buy a house"
+        - "how to start a business"
+        - "process for applying for visa"
+        """
+        lines = []
+        
+        # Extract topic from query
+        topic = self._extract_topic(query)
+        lines.append(f"📋 Guide: {topic}")
+        lines.append("")
+        lines.append("=" * 80)
+        lines.append("")
+        
+        # Collect all search results and answers with relevance filtering
+        all_results = []
+        answers = []
+        
+        for agent_name, agent_data in data.items():
+            if agent_name in ['search', 'tavily_search'] and isinstance(agent_data, dict):
+                if 'answer' in agent_data and agent_data['answer']:
+                    answers.append(agent_data['answer'])
+                if 'results' in agent_data:
+                    # Filter for relevant results only
+                    for result in agent_data['results']:
+                        if self._is_result_relevant(result, query):
+                            all_results.append(result)
+        
+        # AI-generated summary (if available)
+        if answers:
+            lines.append("📍 Overview:")
+            lines.append(answers[0])  # Use first answer as main summary
+            lines.append("")
+        
+        # Extract and structure information from results
+        if all_results:
+            lines.append("📖 Key Information:")
+            lines.append("")
+            
+            # Show relevant snippets from filtered results
+            for i, result in enumerate(all_results[:5], 1):
+                title = result.get('title', 'Resource')
+                content = result.get('content', result.get('snippet', ''))
+                url = result.get('url', '')
+                
+                lines.append(f"{i}. {title}")
+                if content:
+                    if len(content) > 150:
+                        content = content[:150] + "..."
+                    lines.append(f"   {content}")
+                if url:
+                    lines.append(f"   🔗 {url}")
+                lines.append("")
+        
+        # Add helpful tip
+        lines.append("💡 Tip:")
+        lines.append("   • Review official sources for the most accurate and up-to-date information")
+        lines.append("   • Consider consulting with professionals for specific advice")
+        lines.append("")
+        
+        lines.append("=" * 80)
+        lines.append("")
+        lines.append("ℹ️  This guide is synthesized from available information sources.")
+        
+        return "\n".join(lines)
+
+    def _synthesize_general_info(self, data: Dict[str, Any], query: str) -> str:
+        """
+        Synthesize a general information response from search results.
+        """
+        lines = []
+        
+        # Collect all answers and filtered results
+        answers = []
+        all_results = []
+        
+        for agent_name, agent_data in data.items():
+            if agent_name in ['search', 'tavily_search'] and isinstance(agent_data, dict):
+                if 'answer' in agent_data and agent_data['answer']:
+                    answers.append(agent_data['answer'])
+                if 'results' in agent_data:
+                    # Filter for relevant results
+                    for result in agent_data['results']:
+                        if self._is_result_relevant(result, query):
+                            all_results.append(result)
+        
+        # Main answer
+        if answers:
+            lines.append("💡 Answer:")
+            lines.append(answers[0])
+            lines.append("")
+        
+        # Supporting results
+        if all_results:
+            lines.append(f"🔍 Found {len(all_results)} relevant result(s):")
+            lines.append("")
+            
+            for i, result in enumerate(all_results[:5], 1):
+                title = result.get('title', 'Resource')
+                content = result.get('content', result.get('snippet', ''))
+                url = result.get('url', '')
+                
+                lines.append(f"{i}. {title}")
+                if content and len(content) > 100:
+                    lines.append(f"   {content[:100]}...")
+                if url:
+                    lines.append(f"   🔗 {url}")
+                lines.append("")
+        
+        return "\n".join(lines) if lines else "No results available."
+
+    def _extract_topic(self, query: str) -> str:
+        """Extract the main topic from the query."""
+        import re
+        
+        # Remove common prefixes
+        cleaned = re.sub(r'^(what are the |how to |steps to |process for |guide to )', '', query.lower())
+        cleaned = re.sub(r'\?$', '', cleaned)  # Remove trailing question mark
+        
+        return cleaned.strip().title()
+
+    def _is_trip_planning_query(self, query: str) -> bool:
+        """Check if the query is about trip planning."""
+        if not query:
+            return False
+        query_lower = query.lower()
+        return any(keyword in query_lower for keyword in self.trip_keywords)
+
+    def _has_search_results(self, data: Dict[str, Any]) -> bool:
+        """Check if data contains search results from search or tavily_search agents."""
+        return any(agent_name in ['search', 'tavily_search'] for agent_name in data.keys())
+
+    def _synthesize_trip_plan(self, data: Dict[str, Any], query: str) -> str:
+        """
+        Synthesize a trip plan from search results.
+        
+        This method extracts information from search results and creates
+        a coherent trip planning response internally within the orchestrator.
+        """
+        lines = []
+        
+        # Extract origin and destination from query
+        import re
+        from_to_match = re.search(r'from\s+([a-zA-Z\s]+?)\s+to\s+([a-zA-Z\s]+)', query, re.IGNORECASE)
+        if from_to_match:
+            origin = from_to_match.group(1).strip().title()
+            destination = from_to_match.group(2).strip().title()
+            lines.append(f"🗺️  Trip Plan: {origin} to {destination}")
+        else:
+            lines.append("🗺️  Your Trip Plan")
+        
+        lines.append("")
+        lines.append("=" * 80)
+        lines.append("")
+        
+        # Collect all search results with relevance filtering
+        all_results = []
+        answer = None
+        
+        for agent_name, agent_data in data.items():
+            if agent_name in ['search', 'tavily_search'] and isinstance(agent_data, dict):
+                if 'answer' in agent_data and agent_data['answer']:
+                    answer = agent_data['answer']
+                if 'results' in agent_data:
+                    # Filter for relevant results
+                    for result in agent_data['results']:
+                        if self._is_result_relevant(result, query):
+                            all_results.append(result)
+
+        
+        # Summary section (from AI answer if available)
+        if answer:
+            lines.append("📍 Route Overview:")
+            lines.append(answer)
+            lines.append("")
+        
+        # Points of Interest section
+        if all_results:
+            lines.append("🎯 Points of Interest & Resources:")
+            lines.append("")
+            
+            for i, result in enumerate(all_results[:6], 1):  # Show top 6 results
+                title = result.get('title', 'Resource')
+                content = result.get('content', result.get('snippet', ''))
+                url = result.get('url', '')
+                
+                lines.append(f"{i}. {title}")
+                if content:
+                    # Truncate content
+                    if len(content) > 120:
+                        content = content[:120] + "..."
+                    lines.append(f"   {content}")
+                if url:
+                    lines.append(f"   🔗 {url}")
+                lines.append("")
+        
+        # Travel tips
+        lines.append("💡 Travel Tips:")
+        lines.append("   • Check traffic conditions before departure")
+        lines.append("   • Plan for rest stops every 2-3 hours")
+        lines.append("   • Consider visiting attractions during off-peak hours")
+        lines.append("   • Check opening hours for points of interest")
+        lines.append("")
+        
+        lines.append("=" * 80)
+        lines.append("")
+        lines.append("ℹ️  This trip plan is synthesized from available information.")
+        lines.append("   For detailed navigation, please use a dedicated GPS or mapping service.")
+        
+        return "\n".join(lines)
 
     def _format_agent_response(self, agent_name: str, agent_data: Any) -> str:
         """Format a single agent's response."""

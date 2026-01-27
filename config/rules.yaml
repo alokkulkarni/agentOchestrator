@@ -3,6 +3,89 @@
 # When a rule matches, the specified agents are called
 
 rules:
+  # ============================================================================
+  # EXCLUSION RULES - Highest Priority (110+)
+  # These catch queries that should NOT be handled by any agent
+  # ============================================================================
+  
+  # Rule to explicitly reject unsupported queries
+  - name: "unsupported_queries"
+    priority: 110
+    conditions:
+      # Customer service queries
+      - field: "query"
+        operator: "contains"
+        value: "change my address"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "update my address"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "change address"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "update address"
+        case_sensitive: false
+      # Account management
+      - field: "query"
+        operator: "contains"
+        value: "change my password"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "reset password"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "update my profile"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "change my email"
+        case_sensitive: false
+      # Customer service
+      - field: "query"
+        operator: "contains"
+        value: "speak to representative"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "talk to agent"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "customer service"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "call center"
+        case_sensitive: false
+      # Financial transactions (account-specific)
+      - field: "query"
+        operator: "contains"
+        value: "check my balance"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "transfer money"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "pay bill"
+        case_sensitive: false
+    logic: "or"  # Match if ANY condition is true
+    target_agents: []  # Empty list = no agents
+    confidence: 1.0  # 100% confident these shouldn't be handled
+    enabled: true
+
+  # ============================================================================
+  # CAPABILITY-BASED RULES (100-109)
+  # These match specific agent capabilities
+  # ============================================================================
+  
   # High-priority rule for math/calculation queries
   - name: "math_queries"
     priority: 100
@@ -97,7 +180,63 @@ rules:
     confidence: 0.85
     enabled: true
 
-  # Rule for application planning queries
+  # Rule for trip/travel planning queries (high priority)
+  - name: "trip_planning_queries"
+    priority: 99
+    conditions:
+      - field: "query"
+        operator: "contains"
+        value: "plan a trip"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "plan trip"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "travel plan"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "itinerary"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "route from"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "journey from"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "travel from"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "points of interest"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "road trip"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "drive from"
+        case_sensitive: false
+      - field: "query"
+        operator: "regex"
+        value: "from\\s+\\w+\\s+to\\s+\\w+"
+        case_sensitive: false
+    logic: "or"  # Match if ANY condition is true
+    target_agents:
+      - "search"
+      - "tavily_search"
+    execution_mode: "sequential"  # Search first, orchestrator synthesizes
+    confidence: 0.95
+    enabled: true
+
+  # Rule for software development planning queries (disabled - orchestrator synthesizes)
   - name: "planning_queries"
     priority: 98
     conditions:
@@ -195,9 +334,10 @@ rules:
         case_sensitive: false
     logic: "or"
     target_agents:
-      - "planning"
-    confidence: 0.95
-    enabled: true
+      - "search"
+      - "tavily_search"
+    confidence: 0.90
+    enabled: false  # Disabled - orchestrator handles synthesis
 
   # Rule for tech insights queries
   - name: "tech_insights_queries"

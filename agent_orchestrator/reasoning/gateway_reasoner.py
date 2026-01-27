@@ -416,28 +416,40 @@ Available Agents:
 
 YOUR THINKING PROCESS:
 1. ONLY select agents whose capabilities DIRECTLY match the query intent
-2. Planning agent: For creating structured plans including:
-   - Software/application development plans with epics and user stories
-   - Trip itineraries and travel plans (use WITH search agents to gather information)
-   - Example queries for planning: "plan a web app", "plan a trip from X to Y", "create travel itinerary"
-3. Trip/Travel Planning: Use planning agent + search agents together
-   - Planning agent structures the itinerary
-   - Search agents gather location info, transportation, attractions
-   - MODE should be sequential (search first, then planning uses results)
-   - Example: "plan trip from Manchester to Penrith" → AGENTS: search, tavily_search, planning
-4. Weather agent: ONLY for direct weather/forecast queries - NOT as part of trip planning
-   - Example queries that SHOULD use weather: "weather in London", "forecast for tomorrow"
-   - Example queries that SHOULD NOT use weather alone: "plan a trip to London" (use planning + search instead)
-5. Calculator agent: ONLY for mathematical calculations
+2. CRITICAL - NEVER call planning agent:
+   - The orchestrator handles ALL planning and synthesis internally
+   - Planning agent is DISABLED and should NEVER be selected
+   - For ANY query requiring planning/synthesis: Use search agents, orchestrator synthesizes
+   - Examples that should NOT use planning agent:
+     * "steps to buy a house" → AGENTS: search, tavily_search (orchestrator synthesizes)
+     * "plan a trip" → AGENTS: search, tavily_search (orchestrator synthesizes)
+     * "how to start a business" → AGENTS: search, tavily_search (orchestrator synthesizes)
+     * "create an app plan" → AGENTS: search, tavily_search (orchestrator synthesizes)
+3. Information Queries: ONLY use search agents (orchestrator will synthesize)
+   - Search agents gather information
+   - MODE should be sequential
+   - Orchestrator will internally synthesize a coherent response
+   - Example 1: "what are the steps to buy a house" → AGENTS: search, tavily_search
+   - Example 2: "how to start a business in UK" → AGENTS: search, tavily_search
+   - Example 3: "explain the process of applying for a visa" → AGENTS: search, tavily_search
+4. Trip/Travel Planning: ONLY use search agents (orchestrator synthesizes)
+   - Example: "plan trip from Manchester to Penrith" → AGENTS: search, tavily_search
+5. Weather agent: ONLY for direct weather/forecast queries
+   - Example: "weather in London" → AGENTS: weather
+6. Calculator agent: ONLY for mathematical calculations
 6. Search agents: For information retrieval - can be used WITH planning for trip queries
    - Standalone for factual queries: "what is the population of Paris"
    - WITH planning for trip queries: "plan a trip" → search + planning
-7. If query is about:
-   - Customer service, personal info, account updates, address changes → AGENTS: none
-   - General life planning, event planning, scheduling → AGENTS: none
+7. IMPORTANT - Queries that MUST return "none" (strictly enforced):
+   - Customer service: "speak to representative", "call center", "customer service" → AGENTS: none
+   - Personal info/account updates: "change my address", "update address", "change password", "reset password" → AGENTS: none
+   - Account actions: "check my balance", "transfer money", "pay bill" → AGENTS: none
+   - General life planning: "plan my wedding", "schedule my week", "organize my calendar" → AGENTS: none
+   - Example: "I want to change my address" → AGENTS: none (This is account management, not trip planning)
 8. If NO agent capabilities match the query, MUST respond with: AGENTS: none
-9. When uncertain, it's better to return "none" than select the wrong agent
+9. For trip/travel/route planning queries: ALWAYS select planning + search agents (never return none)
 10. Do NOT try to be helpful by selecting loosely related agents - be strict about capability matching
+    EXCEPTION: Trip/travel queries are a perfect match for planning agent capabilities
 
 Based on the query and available agents, respond with:
 1. Which agent(s) should be called (you CAN call same agent multiple times)
