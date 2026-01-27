@@ -70,11 +70,51 @@ rules:
         case_sensitive: false
       - field: "query"
         operator: "contains"
+        value: "account balance"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "my balance"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "current balance"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "show balance"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "view my account"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
         value: "transfer money"
         case_sensitive: false
       - field: "query"
         operator: "contains"
+        value: "send money"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "make payment"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
         value: "pay bill"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "pay my"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "transaction history"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "recent transactions"
         case_sensitive: false
     logic: "or"  # Match if ANY condition is true
     target_agents: []  # Empty list = no agents

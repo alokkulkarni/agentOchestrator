@@ -437,19 +437,36 @@ YOUR THINKING PROCESS:
 5. Weather agent: ONLY for direct weather/forecast queries
    - Example: "weather in London" → AGENTS: weather
 6. Calculator agent: ONLY for mathematical calculations
-6. Search agents: For information retrieval - can be used WITH planning for trip queries
-   - Standalone for factual queries: "what is the population of Paris"
-   - WITH planning for trip queries: "plan a trip" → search + planning
-7. IMPORTANT - Queries that MUST return "none" (strictly enforced):
+7. Search agent selection - CRITICAL distinction:
+   - 'search' agent: Searches LOCAL workspace files/documents
+     * Use ONLY for code-related queries or workspace content
+     * Example: "find function in my code", "what files do I have"
+   - 'tavily_search' agent: Searches the INTERNET using AI web search
+     * Use for real-world information, products, services, companies
+     * Example: "Virgin Money credit cards", "buy house in UK", "trip to Paris"
+   - For general information queries about real-world topics: ALWAYS use tavily_search
+   - For trip planning: Use BOTH search + tavily_search sequentially
+   - NEVER use 'search' alone for real-world information queries
+9. IMPORTANT - Queries that MUST return "none" (strictly enforced):
    - Customer service: "speak to representative", "call center", "customer service" → AGENTS: none
    - Personal info/account updates: "change my address", "update address", "change password", "reset password" → AGENTS: none
-   - Account actions: "check my balance", "transfer money", "pay bill" → AGENTS: none
+   - Account actions: "check my balance", "current balance", "account balance", "my balance" → AGENTS: none
+   - Financial transactions: "transfer money", "send money", "pay bill", "make payment" → AGENTS: none
+   - Account viewing: "view my account", "transaction history", "recent transactions" → AGENTS: none
    - General life planning: "plan my wedding", "schedule my week", "organize my calendar" → AGENTS: none
-   - Example: "I want to change my address" → AGENTS: none (This is account management, not trip planning)
-8. If NO agent capabilities match the query, MUST respond with: AGENTS: none
-9. For trip/travel/route planning queries: ALWAYS select planning + search agents (never return none)
-10. Do NOT try to be helpful by selecting loosely related agents - be strict about capability matching
-    EXCEPTION: Trip/travel queries are a perfect match for planning agent capabilities
+   - Example 1: "I want to change my address" → AGENTS: none (account management)
+   - Example 2: "What is my current account balance?" → AGENTS: none (account-specific query)
+   - Example 3: "I want to know my balance" → AGENTS: none (account-specific query)
+10. If NO agent capabilities match the query, MUST respond with: AGENTS: none
+11. For trip/travel/route planning queries: Use search agents (orchestrator synthesizes)
+12. Do NOT try to be helpful by selecting loosely related agents - be strict about capability matching
+
+CRITICAL EXAMPLES:
+- "Virgin Money credit cards" → AGENTS: tavily_search (web search for real-world info)
+- "steps to buy a house in UK" → AGENTS: tavily_search (web search for real-world process)
+- "what files are in my project" → AGENTS: search (local workspace search)
+- "find function called handleClick" → AGENTS: search (local code search)
+- "plan trip from Manchester to Penrith" → AGENTS: search, tavily_search (both for trip planning)
 
 Based on the query and available agents, respond with:
 1. Which agent(s) should be called (you CAN call same agent multiple times)
