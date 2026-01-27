@@ -103,43 +103,15 @@ rules:
     conditions:
       - field: "query"
         operator: "contains"
-        value: "plan"
-        case_sensitive: false
-      - field: "query"
-        operator: "contains"
-        value: "create a plan"
-        case_sensitive: false
-      - field: "query"
-        operator: "contains"
-        value: "draft a plan"
-        case_sensitive: false
-      - field: "query"
-        operator: "contains"
-        value: "requirements"
-        case_sensitive: false
-      - field: "query"
-        operator: "contains"
-        value: "user stories"
-        case_sensitive: false
-      - field: "query"
-        operator: "contains"
-        value: "user story"
-        case_sensitive: false
-      - field: "query"
-        operator: "contains"
-        value: "epics"
-        case_sensitive: false
-      - field: "query"
-        operator: "contains"
-        value: "epic"
-        case_sensitive: false
-      - field: "query"
-        operator: "contains"
         value: "application plan"
         case_sensitive: false
       - field: "query"
         operator: "contains"
         value: "project plan"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "software plan"
         case_sensitive: false
       - field: "query"
         operator: "contains"
@@ -164,6 +136,58 @@ rules:
       - field: "query"
         operator: "contains"
         value: "design application"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "design system"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "develop application"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "develop software"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "trip itinerary"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "travel itinerary"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "plan a trip"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "plan my trip"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "itinerary from"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "requirements"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "user stories"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "user story"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "epics"
+        case_sensitive: false
+      - field: "query"
+        operator: "contains"
+        value: "epic"
         case_sensitive: false
       - field: "requirements"
         operator: "exists"

@@ -94,6 +94,9 @@ class GatewayReasoner:
         """
         # Build prompt for agent routing
         prompt = self._build_routing_prompt(query, agent_capabilities, context)
+        
+        # Debug log the prompt being sent
+        logger.debug(f"AI reasoner prompt (first 500 chars):\n{prompt[:500]}...")
 
         # Create messages
         messages = [{"role": "user", "content": prompt}]
@@ -104,6 +107,9 @@ class GatewayReasoner:
 
             # Parse response
             reasoning_text = response["content"]
+            
+            # Debug log the response received
+            logger.debug(f"AI response from gateway:\n{reasoning_text}")
 
             # Extract agent selection from response
             plan = self._parse_routing_response(reasoning_text, agent_capabilities)
@@ -384,7 +390,11 @@ class GatewayReasoner:
         context: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Build prompt for agent routing decision."""
-        prompt = f"""You are an agent orchestration system. Your job is to analyze the user's query and determine which agent(s) should handle it.
+        prompt = f"""You are an intelligent agent orchestration system. Your role is to:
+1. Carefully analyze the user's query
+2. Think step-by-step about what the query is asking for
+3. Plan the best approach to fulfill the request
+4. Select the appropriate agent(s) to execute the plan
 
 User Query: {query}
 
@@ -403,17 +413,31 @@ Available Agents:
             prompt += f"\nContext: {context}\n"
 
         prompt += """
-CRITICAL AGENT SELECTION RULES:
+
+YOUR THINKING PROCESS:
 1. ONLY select agents whose capabilities DIRECTLY match the query intent
-2. Planning agent: ONLY for software/application development planning with explicit keywords:
-   - "plan", "design app", "create application", "build software", "develop system"
-   - Example queries that SHOULD use planning: "plan a web app", "design system architecture"
-   - Example queries that SHOULD NOT use planning: "change my address", "update profile", "help me with X"
-3. If query is about customer service, personal information, account updates, address changes:
-   - Return AGENTS: none (no agent available for this query)
-4. If NO agent capabilities match the query, MUST respond with: AGENTS: none
-5. When uncertain, it's better to return "none" than select the wrong agent
-6. Do NOT try to be helpful by selecting loosely related agents - be strict about capability matching
+2. Planning agent: For creating structured plans including:
+   - Software/application development plans with epics and user stories
+   - Trip itineraries and travel plans (use WITH search agents to gather information)
+   - Example queries for planning: "plan a web app", "plan a trip from X to Y", "create travel itinerary"
+3. Trip/Travel Planning: Use planning agent + search agents together
+   - Planning agent structures the itinerary
+   - Search agents gather location info, transportation, attractions
+   - MODE should be sequential (search first, then planning uses results)
+   - Example: "plan trip from Manchester to Penrith" → AGENTS: search, tavily_search, planning
+4. Weather agent: ONLY for direct weather/forecast queries - NOT as part of trip planning
+   - Example queries that SHOULD use weather: "weather in London", "forecast for tomorrow"
+   - Example queries that SHOULD NOT use weather alone: "plan a trip to London" (use planning + search instead)
+5. Calculator agent: ONLY for mathematical calculations
+6. Search agents: For information retrieval - can be used WITH planning for trip queries
+   - Standalone for factual queries: "what is the population of Paris"
+   - WITH planning for trip queries: "plan a trip" → search + planning
+7. If query is about:
+   - Customer service, personal info, account updates, address changes → AGENTS: none
+   - General life planning, event planning, scheduling → AGENTS: none
+8. If NO agent capabilities match the query, MUST respond with: AGENTS: none
+9. When uncertain, it's better to return "none" than select the wrong agent
+10. Do NOT try to be helpful by selecting loosely related agents - be strict about capability matching
 
 Based on the query and available agents, respond with:
 1. Which agent(s) should be called (you CAN call same agent multiple times)

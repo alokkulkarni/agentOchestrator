@@ -481,11 +481,14 @@ agents:
       - "user-story-creation"
       - "software-planning"
       - "product-planning"
+      - "trip-planning"
+      - "itinerary-planning"
+      - "travel-planning"
 
     # Strict role for planning with validation
     role:
       name: "application-planner"
-      description: "Creates detailed SOFTWARE APPLICATION plans with epics and user stories. ONLY for software/app development planning, NOT for personal tasks, business operations, or customer service."
+      description: "Creates structured plans including software development plans (with epics/user stories) and travel itineraries. Works with search agents to gather information and create detailed plans. Supports both software planning and trip/travel planning."
       allowed_operations:
         - "plan_application"
         - "validate_requirements"
