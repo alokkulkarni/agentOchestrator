@@ -296,16 +296,28 @@ class HybridReasoner:
                         )
 
                         suggested_agents = validation.get("suggested_agents", [])
+                        ai_confidence = validation.get("confidence", 0)
+                        
+                        # Only use AI override if confidence is reasonable (>= 0.5)
+                        if ai_confidence < 0.5:
+                            logger.info(
+                                f"AI override confidence too low ({ai_confidence:.2f}), "
+                                f"returning no match instead of incorrect suggestion"
+                            )
+                            return None
+                        
                         if suggested_agents:
                             # Filter to only include available agents
                             available_names = {agent.name for agent in available_agents}
                             valid_suggested = [a for a in suggested_agents if a in available_names]
 
                             if valid_suggested:
-                                logger.info(f"Using AI-suggested agents instead: {valid_suggested}")
+                                logger.info(
+                                    f"Using AI-suggested agents (confidence: {ai_confidence:.2f}): {valid_suggested}"
+                                )
                                 return ReasoningResult(
                                     agents=valid_suggested,
-                                    confidence=validation["confidence"],
+                                    confidence=ai_confidence,
                                     method="ai_override",
                                     reasoning=f"AI override of multi-rule: {validation['reasoning']}",
                                     parameters=validation.get("parameters", {}),
@@ -349,10 +361,19 @@ class HybridReasoner:
                         )
                     else:
                         # AI rejected rule selection, use AI's suggested agents
+                        ai_confidence = validation.get("confidence", 0)
                         logger.warning(
-                            f"AI rejected rule selection (confidence={validation['confidence']:.2f}): "
+                            f"AI rejected rule selection (confidence={ai_confidence:.2f}): "
                             f"{validation['reasoning']}"
                         )
+
+                        # Only use AI override if confidence is reasonable (>= 0.5)
+                        if ai_confidence < 0.5:
+                            logger.info(
+                                f"AI override confidence too low ({ai_confidence:.2f}), "
+                                f"returning no match instead of incorrect suggestion"
+                            )
+                            return None
 
                         suggested_agents = validation.get("suggested_agents", [])
                         if suggested_agents:
@@ -361,10 +382,12 @@ class HybridReasoner:
                             valid_suggested = [a for a in suggested_agents if a in available_names]
 
                             if valid_suggested:
-                                logger.info(f"Using AI-suggested agents instead: {valid_suggested}")
+                                logger.info(
+                                    f"Using AI-suggested agents (confidence: {ai_confidence:.2f}): {valid_suggested}"
+                                )
                                 return ReasoningResult(
                                     agents=valid_suggested,
-                                    confidence=validation["confidence"],
+                                    confidence=ai_confidence,
                                     method="ai_override",
                                     reasoning=f"AI override: {validation['reasoning']}",
                                     parallel=False,

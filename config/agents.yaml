@@ -474,18 +474,18 @@ agents:
       is_async: false
 
     capabilities:
-      - "planning"
-      - "requirements"
-      - "user-stories"
-      - "epics"
       - "project-planning"
-      - "application-design"
-      - "product-management"
+      - "application-planning"
+      - "requirements-planning"
+      - "epic-creation"
+      - "user-story-creation"
+      - "software-planning"
+      - "product-planning"
 
     # Strict role for planning with validation
     role:
       name: "application-planner"
-      description: "Creates detailed application plans with epics and user stories, validates against requirements"
+      description: "Creates detailed SOFTWARE APPLICATION plans with epics and user stories. ONLY for software/app development planning, NOT for personal tasks, business operations, or customer service."
       allowed_operations:
         - "plan_application"
         - "validate_requirements"

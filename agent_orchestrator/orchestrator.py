@@ -26,7 +26,14 @@ from .config import (
     load_all_configs,
     OrchestratorConfig,
 )
-from .formatting import ResponseFormatter
+from .evaluators import (
+    ActionCategory,
+    EvaluationResult,
+    UserActionHistory,
+    get_action_history,
+)
+from .evaluators.registry import EvaluatorRegistry, map_query_to_action_category
+from .formatting import ResponseFormatter, get_conversational_wrapper
 from .observability import (
     orchestrator_metrics,
     metrics_server,
@@ -209,6 +216,14 @@ class Orchestrator:
 
         # Initialize response formatter for user-friendly output
         self.response_formatter = ResponseFormatter()
+        
+        # Initialize conversational wrapper for human-like responses
+        self.conversational_wrapper = get_conversational_wrapper()
+        
+        # Initialize evaluator system for action validation
+        self.action_history = get_action_history()
+        self.evaluator_registry = EvaluatorRegistry(self.action_history)
+        self._load_evaluators()
 
         # Execution context
         self._execution_history: List[Dict[str, Any]] = []
@@ -437,6 +452,32 @@ class Orchestrator:
             )
         else:
             raise ConfigurationError(f"Unknown agent type: {config.type}")
+    
+    def _load_evaluators(self):
+        """Load evaluators from configuration file."""
+        try:
+            import yaml
+            evaluators_config_path = os.path.join(
+                os.path.dirname(self.config_path),
+                "evaluators.yaml"
+            )
+            
+            if os.path.exists(evaluators_config_path):
+                with open(evaluators_config_path, 'r') as f:
+                    evaluators_config = yaml.safe_load(f)
+                
+                self.evaluator_registry.load_from_config(evaluators_config)
+                logger.info(
+                    f"Loaded {len(self.evaluator_registry.evaluators)} evaluator(s) "
+                    f"from {evaluators_config_path}"
+                )
+            else:
+                logger.info(
+                    f"No evaluators config found at {evaluators_config_path}, "
+                    "skipping evaluator initialization"
+                )
+        except Exception as e:
+            logger.warning(f"Failed to load evaluators config: {e}")
 
     async def process(
         self,
@@ -539,22 +580,40 @@ class Orchestrator:
                                 error_message=error_msg,
                                 request_id=request_id,
                             )
+                            
+                            # Add conversational wrapper to error
+                            query_text = input_data.get("query", str(input_data))
+                            session_id = get_session_id()
+                            output["formatted_text"] = self.conversational_wrapper.wrap_response(
+                                original_response=error_msg,
+                                query=query_text,
+                                session_id=session_id,
+                                is_error=True,
+                                metadata=output.get("_metadata")
+                            )
+                            
                             self.query_logger.finalize_query_log(query_context, output)
                             return output
 
                 # Step 2: Reasoning - determine which agents to call
                 reasoning_result = await self._reason_with_observability(input_data, span)
                 if not reasoning_result:
-                    error_msg = "No agents could be determined for this request"
+                    # Create graceful, human-like apology message
+                    query_text = input_data.get("query", str(input_data))
+                    error_msg = (
+                        f"I apologize, but I'm unable to help with your request at the moment. "
+                        f"I don't currently have the right capabilities to assist with what you're asking for."
+                    )
+                    
                     self.query_logger.log_error(
                         query_context,
-                        error_type="ReasoningError",
-                        error_message=error_msg,
+                        error_type="UnsupportedRequest",
+                        error_message=f"No suitable agent for query: {query_text}",
                     )
 
                     # Record metrics
                     orchestrator_metrics.queries_failed.labels(
-                        error_type="ReasoningError",
+                        error_type="UnsupportedRequest",
                         reasoning_mode=self.config.reasoning_mode
                     ).inc()
 
@@ -562,6 +621,17 @@ class Orchestrator:
                         error_message=error_msg,
                         request_id=request_id,
                     )
+                    
+                    # Add conversational wrapper to enhance the apology
+                    session_id = get_session_id()
+                    output["formatted_text"] = self.conversational_wrapper.wrap_response(
+                        original_response=error_msg,
+                        query=query_text,
+                        session_id=session_id,
+                        is_error=True,
+                        metadata=output.get("_metadata")
+                    )
+                    
                     self.query_logger.finalize_query_log(query_context, output)
                     return output
 
@@ -584,7 +654,74 @@ class Orchestrator:
                     f"(method={reasoning_result.method}, confidence={reasoning_result.confidence:.2f})"
                 )
 
-                # Step 3: Execute agents with validation and retry
+                # Step 3: Evaluate if action is allowed (policy check)
+                session_id = get_session_id()
+                user_id = input_data.get("user_id", session_id or "anonymous")
+                query_text = input_data.get("query", str(input_data))
+                
+                # Determine action category from query and agents
+                action_category = map_query_to_action_category(
+                    query_text,
+                    agent_name=reasoning_result.agents[0] if reasoning_result.agents else None
+                )
+                
+                # Evaluate with all configured evaluators
+                evaluation_result = await self.evaluator_registry.evaluate_action(
+                    user_id=user_id,
+                    requested_action=query_text,
+                    requested_category=action_category,
+                    request_details=input_data
+                )
+                
+                # If action is denied, return graceful response
+                if not evaluation_result.allowed:
+                    logger.warning(
+                        f"Action denied by evaluator: {evaluation_result.reason} "
+                        f"(evaluator: {evaluation_result.evaluator_name})"
+                    )
+                    
+                    # Create denial message
+                    denial_message = f"🚫 {evaluation_result.reason}"
+                    if evaluation_result.blocked_until:
+                        denial_message += f"\n\n⏰ This restriction will be lifted on {evaluation_result.blocked_until.strftime('%Y-%m-%d at %H:%M:%S')}."
+                    
+                    # Log the denial
+                    self.query_logger.log_error(
+                        query_context,
+                        error_type="PolicyViolation",
+                        error_message=evaluation_result.reason,
+                        error_details=evaluation_result.to_dict()
+                    )
+                    
+                    # Create output with denial
+                    output = self.output_formatter.create_error_output(
+                        error_message=denial_message,
+                        request_id=request_id,
+                        additional_info={"policy_evaluation": evaluation_result.to_dict()}
+                    )
+                    
+                    # Wrap with conversational elements
+                    output["formatted_text"] = self.conversational_wrapper.wrap_response(
+                        original_response=denial_message,
+                        query=query_text,
+                        session_id=session_id,
+                        is_error=True,
+                        metadata=output.get("_metadata")
+                    )
+                    
+                    # Record metrics
+                    orchestrator_metrics.queries_failed.labels(
+                        error_type="PolicyViolation",
+                        reasoning_mode=self.config.reasoning_mode
+                    ).inc()
+                    
+                    self.query_logger.finalize_query_log(query_context, output)
+                    return output
+                
+                # Action is allowed, proceed with execution
+                logger.info(f"Action evaluation passed for user {user_id}")
+
+                # Step 4: Execute agents with validation and retry
                 max_retries = getattr(self.config, 'validation_max_retries', 2)
                 output = await self._execute_and_validate(
                     query_context=query_context,
@@ -624,6 +761,20 @@ class Orchestrator:
 
                 # Update session metrics
                 orchestrator_metrics.queries_per_session.observe(1)
+                
+                # Record successful action in history for future policy evaluations
+                self.action_history.record_action(
+                    user_id=user_id,
+                    action_type=query_text,
+                    action_category=action_category,
+                    details={
+                        "agents": reasoning_result.agents,
+                        "duration_seconds": duration_seconds,
+                        "request_id": request_id
+                    },
+                    agent_name=reasoning_result.agents[0] if reasoning_result.agents else None,
+                    success=output.get("success", True)
+                )
 
                 logger.info(f"Request {request_id} completed successfully in {duration_seconds:.3f}s")
                 return output
@@ -655,6 +806,18 @@ class Orchestrator:
                     error_message=f"Orchestration error: {str(e)}",
                     request_id=request_id,
                 )
+                
+                # Add conversational wrapper to error
+                query_text = input_data.get("query", str(input_data))
+                session_id = get_session_id()
+                output["formatted_text"] = self.conversational_wrapper.wrap_response(
+                    original_response=f"I encountered an error while processing your request: {str(e)}",
+                    query=query_text,
+                    session_id=session_id,
+                    is_error=True,
+                    metadata=output.get("_metadata")
+                )
+                
                 self.query_logger.finalize_query_log(query_context, output)
                 return output
 
@@ -1048,6 +1211,17 @@ class Orchestrator:
                 # Add formatted text for user-friendly display
                 agent_data = output.get("data", {})
                 formatted_text = self.response_formatter.format_response(agent_data)
+                
+                # Wrap with conversational elements
+                query_text = input_data.get("query", str(input_data))
+                session_id = get_session_id()  # Get from context
+                formatted_text = self.conversational_wrapper.wrap_response(
+                    original_response=formatted_text,
+                    query=query_text,
+                    session_id=session_id,
+                    is_error=False,
+                    metadata=output.get("_metadata")
+                )
                 output["formatted_text"] = formatted_text
 
                 return output
@@ -1103,6 +1277,17 @@ class Orchestrator:
                 # Add formatted text for user-friendly display
                 agent_data = output.get("data", {})
                 formatted_text = self.response_formatter.format_response(agent_data)
+                
+                # Wrap with conversational elements (treating as partial error)
+                query_text = input_data.get("query", str(input_data))
+                session_id = get_session_id()  # Get from context
+                formatted_text = self.conversational_wrapper.wrap_response(
+                    original_response=formatted_text,
+                    query=query_text,
+                    session_id=session_id,
+                    is_error=False,  # Still provide helpful output
+                    metadata=output.get("_metadata")
+                )
                 output["formatted_text"] = formatted_text
 
                 return output
@@ -1164,6 +1349,8 @@ class Orchestrator:
             "agents": self.agent_registry.get_stats(),
             "reasoning": self.hybrid_reasoner.get_stats() if self.hybrid_reasoner else {},
             "schemas": self.schema_validator.list_schemas(),
+            "evaluators": self.evaluator_registry.get_stats(),
+            "action_history": self.action_history.get_stats(),
         }
 
         # Add observability stats if enabled

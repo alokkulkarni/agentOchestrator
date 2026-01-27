@@ -1,0 +1,100 @@
+# Evaluator Configuration
+#
+# Defines policy evaluators that validate user actions before execution.
+# Evaluators check if requested actions are allowed based on user history,
+# timing constraints, rate limits, and value thresholds.
+
+# List of evaluators to apply
+evaluators:
+  # Timed Restriction: Blocks certain actions for a period after trigger actions
+  - name: address_change_restriction
+    type: timed_restriction
+    enabled: true
+    config:
+      restrictions:
+        # After address change, block high-risk actions for 24 hours
+        - trigger_category: address_change
+          blocked_categories:
+            - card_order
+            - high_value_transaction
+            - account_closure
+          block_hours: 24
+          reason: "For your security, this action is temporarily restricted after an address change"
+        
+        # After payment method change, block high-value transactions for 12 hours
+        - trigger_category: payment_method_change
+          blocked_categories:
+            - high_value_transaction
+          block_hours: 12
+          reason: "For your security, high-value transactions are temporarily restricted after changing payment method"
+        
+        # After password change, block profile changes for 1 hour
+        - trigger_category: password_change
+          blocked_categories:
+            - address_change
+            - payment_method_change
+            - account_closure
+          block_hours: 1
+          reason: "Profile changes are temporarily restricted after password change"
+
+  # Rate Limit: Limits frequency of certain actions
+  - name: transaction_rate_limit
+    type: rate_limit
+    enabled: true
+    config:
+      limits:
+        # Maximum 3 high-value transactions per day
+        - category: high_value_transaction
+          max_count: 3
+          window_hours: 24
+          reason: "Daily high-value transaction limit reached for your security"
+        
+        # Maximum 5 card orders per month (30 days)
+        - category: card_order
+          max_count: 5
+          window_hours: 720  # 30 days
+          reason: "Monthly card order limit reached"
+        
+        # Maximum 2 address changes per year
+        - category: address_change
+          max_count: 2
+          window_hours: 8760  # 365 days
+          reason: "Annual address change limit reached"
+        
+        # Maximum 10 transfers per day
+        - category: transfer
+          max_count: 10
+          window_hours: 24
+          reason: "Daily transfer limit reached"
+
+  # Threshold: Validates value constraints
+  - name: transaction_threshold
+    type: threshold
+    enabled: true
+    config:
+      thresholds:
+        # High-value transactions require additional validation
+        - category: high_value_transaction
+          field: amount
+          max_value: 10000
+          reason: "Transaction amount exceeds the allowed limit"
+        
+        # Limit transfer amounts
+        - category: transfer
+          field: amount
+          max_value: 5000
+          reason: "Transfer amount exceeds the allowed limit"
+
+# Global settings
+settings:
+  # Track actions for this many days
+  max_history_days: 90
+  
+  # Maximum actions to keep per user
+  max_actions_per_user: 1000
+  
+  # Cleanup old actions automatically
+  enable_auto_cleanup: true
+  
+  # Cleanup interval (hours)
+  cleanup_interval_hours: 24

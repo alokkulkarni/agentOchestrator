@@ -393,12 +393,28 @@ Available Agents:
         for idx, agent in enumerate(agent_capabilities, 1):
             name = agent.name
             capabilities = agent.capabilities
-            prompt += f"{idx}. {name}: {', '.join(capabilities)}\n"
+            role_desc = agent.role.get("description", "") if hasattr(agent, "role") and agent.role else ""
+            prompt += f"{idx}. {name}: {', '.join(capabilities)}"
+            if role_desc:
+                prompt += f" - {role_desc}"
+            prompt += "\n"
 
         if context:
             prompt += f"\nContext: {context}\n"
 
         prompt += """
+CRITICAL AGENT SELECTION RULES:
+1. ONLY select agents whose capabilities DIRECTLY match the query intent
+2. Planning agent: ONLY for software/application development planning with explicit keywords:
+   - "plan", "design app", "create application", "build software", "develop system"
+   - Example queries that SHOULD use planning: "plan a web app", "design system architecture"
+   - Example queries that SHOULD NOT use planning: "change my address", "update profile", "help me with X"
+3. If query is about customer service, personal information, account updates, address changes:
+   - Return AGENTS: none (no agent available for this query)
+4. If NO agent capabilities match the query, MUST respond with: AGENTS: none
+5. When uncertain, it's better to return "none" than select the wrong agent
+6. Do NOT try to be helpful by selecting loosely related agents - be strict about capability matching
+
 Based on the query and available agents, respond with:
 1. Which agent(s) should be called (you CAN call same agent multiple times)
 2. Whether they should run in parallel or sequential
@@ -441,9 +457,9 @@ Data Chaining Example:
   }
 
 Format your response as:
-AGENTS: [agent names separated by commas]
+AGENTS: [agent names separated by commas, OR "none" if no agent matches]
 MODE: [parallel or sequential]
-REASONING: [your reasoning]
+REASONING: [your reasoning - explain why you selected these agents or why none match]
 PARAMETERS: {"agent_name": {"param": value}, ...} (as JSON, MUST match exact format above)
 """
         return prompt
@@ -668,6 +684,12 @@ Respond in JSON format:
         # Extract agents
         if "AGENTS:" in response_text:
             agents_line = response_text.split("AGENTS:")[1].split("\n")[0].strip()
+            
+            # Check if response is "none" - meaning no suitable agent found
+            if agents_line.lower() == "none":
+                logger.info("AI reasoner determined no suitable agent for query")
+                return None
+            
             agent_names = [a.strip() for a in agents_line.split(",")]
 
             # Match to actual agent objects

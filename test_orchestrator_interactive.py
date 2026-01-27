@@ -74,6 +74,10 @@ def print_banner():
     print(f"  {Colors.OKCYAN}/test-all-calc{Colors.ENDC}    - Test all calculator operations")
     print(f"  {Colors.OKCYAN}/multi-parallel{Colors.ENDC}   - Test parallel agent execution")
     print(f"  {Colors.OKCYAN}/multi-sequential{Colors.ENDC} - Test sequential agent execution")
+    print(f"\n{Colors.BOLD}Policy Evaluator Tests:{Colors.ENDC}")
+    print(f"  {Colors.OKCYAN}/test-evaluator-address{Colors.ENDC}  - Test address change restriction")
+    print(f"  {Colors.OKCYAN}/test-evaluator-ratelimit{Colors.ENDC} - Test transaction rate limiting")
+    print(f"  {Colors.OKCYAN}/test-evaluator-threshold{Colors.ENDC} - Test transaction threshold")
     print(f"\n{Colors.BOLD}Other Commands:{Colors.ENDC}")
     print(f"  {Colors.OKCYAN}/stats{Colors.ENDC}            - Show orchestrator statistics")
     print(f"  {Colors.OKCYAN}/health{Colors.ENDC}           - Check API health")
@@ -133,6 +137,14 @@ def print_help():
     print(f"  {Colors.OKCYAN}/multi-sequential{Colors.ENDC}")
     print("    Execute calculator then search agents sequentially")
 
+    print(f"\n{Colors.BOLD}Policy Evaluator Tests:{Colors.ENDC}")
+    print(f"  {Colors.OKCYAN}/test-evaluator-address{Colors.ENDC}")
+    print("    Test address change restriction (24h block on card orders)")
+    print(f"  {Colors.OKCYAN}/test-evaluator-ratelimit{Colors.ENDC}")
+    print("    Test transaction rate limiting (3 high-value transactions per day)")
+    print(f"  {Colors.OKCYAN}/test-evaluator-threshold{Colors.ENDC}")
+    print("    Test transaction threshold validation ($10,000 limit)")
+
     print("\n" + "─" * 70)
     print(f"\n{Colors.BOLD}Query Format:{Colors.ENDC}")
     print("─" * 70)
@@ -161,6 +173,14 @@ def print_examples():
                 "/test-all-calc     - Test all calculator operations",
                 "/multi-parallel    - Test parallel multi-agent execution",
                 "/multi-sequential  - Test sequential multi-agent execution",
+            ]
+        },
+        {
+            "category": "Policy Evaluator Tests",
+            "queries": [
+                "/test-evaluator-address   - Address change → Card order restriction (24h)",
+                "/test-evaluator-ratelimit - High-value transaction rate limiting (3/day)",
+                "/test-evaluator-threshold - Transaction amount threshold ($10,000 limit)",
             ]
         },
         {
@@ -955,6 +975,114 @@ def interactive_session(session: requests.Session):
 
                     print(f"\n{Colors.OKGREEN}{'='*70}{Colors.ENDC}")
                     print(f"{Colors.OKGREEN}✅ All Calculator operations completed!{Colors.ENDC}")
+                    print(f"{Colors.OKGREEN}{'='*70}{Colors.ENDC}\n")
+                    continue
+
+                # Test Evaluator: Address Change Restriction
+                elif command == '/test-evaluator-address':
+                    print(f"\n{Colors.OKGREEN}{'='*70}{Colors.ENDC}")
+                    print(f"{Colors.OKGREEN}Testing: Address Change Restriction Evaluator{Colors.ENDC}")
+                    print(f"{Colors.OKGREEN}{'='*70}{Colors.ENDC}")
+                    print(f"\n{Colors.WARNING}Scenario:{Colors.ENDC}")
+                    print(f"  1. Customer changes address")
+                    print(f"  2. Customer tries to order a new card (should be blocked for 24h)")
+                    print(f"  3. Wait 24 hours and try again (should succeed)")
+                    print(f"\n{Colors.OKCYAN}Step 1: Changing address...{Colors.ENDC}")
+                    
+                    import time
+                    
+                    # Step 1: Address change
+                    addr_request = {
+                        "query": "I need to change my address to 123 New Street",
+                        "user_id": "test_user_address_001"
+                    }
+                    result1 = stream_query(session, addr_request)
+                    print(format_result(result1))
+                    
+                    time.sleep(1)
+                    
+                    # Step 2: Try to order card (should be blocked)
+                    print(f"\n{Colors.OKCYAN}Step 2: Attempting to order a card immediately after...{Colors.ENDC}")
+                    card_request = {
+                        "query": "I want to order a new credit card",
+                        "user_id": "test_user_address_001"
+                    }
+                    result2 = stream_query(session, card_request)
+                    print(format_result(result2))
+                    
+                    print(f"\n{Colors.OKGREEN}{'='*70}{Colors.ENDC}")
+                    print(f"{Colors.OKGREEN}✅ Address Change Restriction Test Completed{Colors.ENDC}")
+                    print(f"{Colors.OKGREEN}Expected: Card order blocked with 24h wait message{Colors.ENDC}")
+                    print(f"{Colors.OKGREEN}{'='*70}{Colors.ENDC}\n")
+                    continue
+
+                # Test Evaluator: Rate Limit
+                elif command == '/test-evaluator-ratelimit':
+                    print(f"\n{Colors.OKGREEN}{'='*70}{Colors.ENDC}")
+                    print(f"{Colors.OKGREEN}Testing: Transaction Rate Limit Evaluator{Colors.ENDC}")
+                    print(f"{Colors.OKGREEN}{'='*70}{Colors.ENDC}")
+                    print(f"\n{Colors.WARNING}Scenario:{Colors.ENDC}")
+                    print(f"  1. Customer makes 3 high-value transactions (allowed)")
+                    print(f"  2. Customer tries a 4th transaction (should be blocked)")
+                    print(f"  Policy: Maximum 3 high-value transactions per 24 hours")
+                    
+                    import time
+                    user_id = "test_user_ratelimit_001"
+                    
+                    for i in range(1, 5):
+                        print(f"\n{Colors.OKCYAN}Transaction {i}: Requesting ${5000 + i*1000} transfer...{Colors.ENDC}")
+                        tx_request = {
+                            "query": f"transfer ${5000 + i*1000} to account 12345",
+                            "user_id": user_id
+                        }
+                        result = stream_query(session, tx_request)
+                        print(format_result(result))
+                        
+                        if i < 4:
+                            time.sleep(0.5)
+                    
+                    print(f"\n{Colors.OKGREEN}{'='*70}{Colors.ENDC}")
+                    print(f"{Colors.OKGREEN}✅ Rate Limit Test Completed{Colors.ENDC}")
+                    print(f"{Colors.OKGREEN}Expected: First 3 transactions allowed, 4th blocked{Colors.ENDC}")
+                    print(f"{Colors.OKGREEN}{'='*70}{Colors.ENDC}\n")
+                    continue
+
+                # Test Evaluator: Threshold
+                elif command == '/test-evaluator-threshold':
+                    print(f"\n{Colors.OKGREEN}{'='*70}{Colors.ENDC}")
+                    print(f"{Colors.OKGREEN}Testing: Transaction Threshold Evaluator{Colors.ENDC}")
+                    print(f"{Colors.OKGREEN}{'='*70}{Colors.ENDC}")
+                    print(f"\n{Colors.WARNING}Scenario:{Colors.ENDC}")
+                    print(f"  1. Customer tries $5,000 transaction (should succeed)")
+                    print(f"  2. Customer tries $15,000 transaction (should be blocked)")
+                    print(f"  Policy: Maximum $10,000 per transaction")
+                    
+                    import time
+                    user_id = "test_user_threshold_001"
+                    
+                    # Test 1: Below threshold
+                    print(f"\n{Colors.OKCYAN}Test 1: Transferring $5,000 (within limit)...{Colors.ENDC}")
+                    tx1_request = {
+                        "query": "transfer $5,000 to savings account",
+                        "user_id": user_id
+                    }
+                    result1 = stream_query(session, tx1_request)
+                    print(format_result(result1))
+                    
+                    time.sleep(1)
+                    
+                    # Test 2: Above threshold
+                    print(f"\n{Colors.OKCYAN}Test 2: Transferring $15,000 (exceeds limit)...{Colors.ENDC}")
+                    tx2_request = {
+                        "query": "transfer $15,000 to checking account",
+                        "user_id": user_id
+                    }
+                    result2 = stream_query(session, tx2_request)
+                    print(format_result(result2))
+                    
+                    print(f"\n{Colors.OKGREEN}{'='*70}{Colors.ENDC}")
+                    print(f"{Colors.OKGREEN}✅ Threshold Test Completed{Colors.ENDC}")
+                    print(f"{Colors.OKGREEN}Expected: $5K allowed, $15K blocked (over $10K limit){Colors.ENDC}")
                     print(f"{Colors.OKGREEN}{'='*70}{Colors.ENDC}\n")
                     continue
 

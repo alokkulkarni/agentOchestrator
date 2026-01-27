@@ -22,6 +22,8 @@ Agent Orchestrator is a powerful framework for building intelligent multi-agent 
 - ⚡ **High Performance**: Async execution, parallel agent calls, circuit breakers
 - 📊 **Observable**: Comprehensive metrics, audit logging, health monitoring
 - 🎛️ **Configuration-Driven**: YAML-based setup, no hardcoding
+- 💬 **Conversational UX**: Human-like responses with natural follow-ups and graceful session closing ✨ *NEW*
+- 🔐 **Policy Enforcement**: Configurable evaluators for action validation and constraint checking ✨ *NEW*
 
 ---
 
@@ -710,6 +712,10 @@ orchestrator:
 
 ## 📚 Documentation
 
+- **[EVALUATOR_IMPLEMENTATION_SUMMARY.md](EVALUATOR_IMPLEMENTATION_SUMMARY.md)** - Policy evaluator implementation summary ✨ *NEW*
+- **[EVALUATORS_GUIDE.md](EVALUATORS_GUIDE.md)** - Complete guide to action evaluators and policy enforcement ✨ *NEW*
+- **[CONVERSATIONAL_QUICKSTART.md](CONVERSATIONAL_QUICKSTART.md)** - Quick start guide for conversational features ✨ *NEW*
+- **[CONVERSATIONAL_FEATURES.md](CONVERSATIONAL_FEATURES.md)** - Complete conversational UX documentation ✨ *NEW*
 - **[AGENT_SELECTION_EXPLAINED.md](AGENT_SELECTION_EXPLAINED.md)** - How agent selection works
 - **[MULTI_AGENT_CONFIRMATION.md](MULTI_AGENT_CONFIRMATION.md)** - Multi-agent distribution & consolidation ⭐
 - **[NEW_AGENTS_SUMMARY.md](NEW_AGENTS_SUMMARY.md)** - Weather & Admin agent documentation
