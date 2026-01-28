@@ -415,6 +415,34 @@ Available Agents:
         prompt += """
 
 YOUR THINKING PROCESS:
+0. CRITICAL - Intent Classification First:
+   Before selecting agents, classify the query intent:
+   
+   A) PERSONAL ACCOUNT QUERY vs GENERAL INFORMATION:
+      Look for possessive indicators: "my", "mine", "I", "me"
+      
+      Personal (REJECT):
+      - "What is MY credit card balance?" → Contains "MY" → AGENTS: none
+      - "Show ME my transactions" → Contains "ME/MY" → AGENTS: none
+      - "I want to check MY balance" → Contains "I/MY" → AGENTS: none
+      
+      General (ALLOW):
+      - "What credit cards does Virgin Money offer?" → No possessive → AGENTS: tavily_search
+      - "How to apply for credit card?" → No possessive → AGENTS: tavily_search
+      - "Credit card interest rates comparison" → No possessive → AGENTS: tavily_search
+   
+   B) FINANCIAL PRODUCTS - Key Distinction:
+      "MY [financial product]" = Personal account (REJECT)
+      "[financial product] products/offers/information" = General info (ALLOW)
+      
+      Examples:
+      - "MY credit card balance" → AGENTS: none
+      - "MY loan status" → AGENTS: none
+      - "MY mortgage payment" → AGENTS: none
+      - "Credit card offers" → AGENTS: tavily_search
+      - "Mortgage rates" → AGENTS: tavily_search
+      - "Loan products available" → AGENTS: tavily_search
+
 1. ONLY select agents whose capabilities DIRECTLY match the query intent
 2. CRITICAL - NEVER call planning agent:
    - The orchestrator handles ALL planning and synthesis internally
@@ -448,25 +476,73 @@ YOUR THINKING PROCESS:
    - For trip planning: Use BOTH search + tavily_search sequentially
    - NEVER use 'search' alone for real-world information queries
 9. IMPORTANT - Queries that MUST return "none" (strictly enforced):
-   - Customer service: "speak to representative", "call center", "customer service" → AGENTS: none
-   - Personal info/account updates: "change my address", "update address", "change password", "reset password" → AGENTS: none
-   - Account actions: "check my balance", "current balance", "account balance", "my balance" → AGENTS: none
-   - Financial transactions: "transfer money", "send money", "pay bill", "make payment" → AGENTS: none
-   - Account viewing: "view my account", "transaction history", "recent transactions" → AGENTS: none
-   - General life planning: "plan my wedding", "schedule my week", "organize my calendar" → AGENTS: none
-   - Example 1: "I want to change my address" → AGENTS: none (account management)
-   - Example 2: "What is my current account balance?" → AGENTS: none (account-specific query)
-   - Example 3: "I want to know my balance" → AGENTS: none (account-specific query)
+   THESE ARE ACCOUNT-SPECIFIC QUERIES - NO AGENTS CAN HELP:
+   
+   a) Balance & Account Viewing:
+      - "check my balance", "want to check my balance", "know my balance" → AGENTS: none
+      - "current balance", "account balance", "my balance", "show balance" → AGENTS: none
+      - "view my account", "see my account", "view account" → AGENTS: none
+      - ANY query with "want to check" + "balance" → AGENTS: none
+      - ANY query with "want to know" + "balance" → AGENTS: none
+   
+   b) Financial Transactions:
+      - "transfer money", "send money", "make payment", "pay bill" → AGENTS: none
+      - "transaction history", "recent transactions" → AGENTS: none
+   
+   c) Account Management:
+      - "change my address", "update address", "change password", "reset password" → AGENTS: none
+   
+   d) Customer Service:
+      - "speak to representative", "customer service", "call center" → AGENTS: none
+   
+   EXAMPLES - ALL MUST RETURN "none":
+   ✅ "I want to check my current account balance" → AGENTS: none
+   ✅ "I want to know my balance" → AGENTS: none  
+   ✅ "What is my account balance?" → AGENTS: none
+   ✅ "Check my balance" → AGENTS: none
+   ✅ "Show me my transactions" → AGENTS: none
+   ✅ "Transfer $100 to John" → AGENTS: none
+   ✅ "Change my address" → AGENTS: none
 10. If NO agent capabilities match the query, MUST respond with: AGENTS: none
 11. For trip/travel/route planning queries: Use search agents (orchestrator synthesizes)
 12. Do NOT try to be helpful by selecting loosely related agents - be strict about capability matching
 
-CRITICAL EXAMPLES:
-- "Virgin Money credit cards" → AGENTS: tavily_search (web search for real-world info)
-- "steps to buy a house in UK" → AGENTS: tavily_search (web search for real-world process)
-- "what files are in my project" → AGENTS: search (local workspace search)
-- "find function called handleClick" → AGENTS: search (local code search)
-- "plan trip from Manchester to Penrith" → AGENTS: search, tavily_search (both for trip planning)
+13. INTELLIGENT CLASSIFICATION - If rules don't catch it:
+    Even if the exact pattern isn't in rules, YOU must classify correctly based on intent:
+    - Look for possessive pronouns (my, mine, I, me, our)
+    - Combined with financial terms (balance, transaction, account, card, loan, mortgage)
+    - This indicates PERSONAL account query → AGENTS: none
+    - Note in reasoning: "Classified as account-specific despite missing specific rule pattern"
+    
+    Example Intelligence:
+    Query: "what is my savings account balance"
+    - Contains: "my" + "balance" → Personal account query
+    - Even if "savings account balance" not in rules
+    - YOU decide: AGENTS: none
+    - Reasoning: "Personal account query (possessive 'my' + financial term 'balance')"
+
+CRITICAL EXAMPLES - Intent Classification:
+
+GENERAL INFORMATION (Supported):
+- "Virgin Money credit cards" → AGENTS: tavily_search (general product info)
+- "What credit cards does Bank X offer?" → AGENTS: tavily_search (general products)
+- "steps to buy a house in UK" → AGENTS: tavily_search (general process)
+- "How to apply for mortgage?" → AGENTS: tavily_search (general how-to)
+- "Credit card interest rates" → AGENTS: tavily_search (general comparison)
+
+PERSONAL ACCOUNT QUERIES (Unsupported - contains possessive):
+- "What is MY credit card balance?" → AGENTS: none (possessive "MY")
+- "Show ME my transactions" → AGENTS: none (possessive "ME/MY")
+- "I want MY account balance" → AGENTS: none (possessive "I/MY")
+- "MY loan status" → AGENTS: none (possessive "MY")
+- "Check MY credit card" → AGENTS: none (possessive "MY")
+
+WORKSPACE QUERIES (Supported):
+- "what files are in my project" → AGENTS: search (local workspace)
+- "find function called handleClick" → AGENTS: search (local code)
+
+TRIP PLANNING (Supported):
+- "plan trip from Manchester to Penrith" → AGENTS: search, tavily_search
 
 Based on the query and available agents, respond with:
 1. Which agent(s) should be called (you CAN call same agent multiple times)
