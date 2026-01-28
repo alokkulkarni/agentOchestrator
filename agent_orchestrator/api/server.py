@@ -361,8 +361,23 @@ async def metrics_endpoint():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+from pydantic import BaseModel
+
+class ReloadRequest(BaseModel):
+    """
+    Request model for correct reload handling.
+    
+    Attributes:
+        force: If true, ignore pending requests and reload immediately.
+        schedule_for: Time string (HH:MM) to schedule the reload. Default is None (immediate).
+    """
+    force: bool = False
+    schedule_for: Optional[str] = None
+
 @app.post("/agents/reload")
-async def reload_agents():
+async def reload_agents(
+    request: Optional[ReloadRequest] = None
+):
     """
     Reload agent configuration without restarting the orchestrator.
 
@@ -371,21 +386,69 @@ async def reload_agents():
     - Remove agents by disabling them in config
     - Update agent configurations
     - All without restarting the server!
+    
+    Mode:
+    - Default: Immediate but graceful (waits for active requests to finish).
+    - Force (`force=true`): Immediate reload, interrupts active requests.
+    - Scheduled (`schedule_for="00:00"`): Schedules the task for a future time.
 
     Returns:
-        JSON with reload results including:
-        - success: Whether reload succeeded
-        - summary: Counts of registered/skipped/failed agents
-        - changes: What was added/removed/updated
-        - agents: Details of registered/skipped/failed agents
+        JSON with reload results or scheduling confirmation.
     """
     if not orchestrator:
         raise HTTPException(status_code=503, detail="Orchestrator not initialized")
 
-    logger.info("📡 Received agent reload request")
+    # Handle defaults if body is empty
+    if request is None:
+        request = ReloadRequest()
 
+    logger.info(f"📡 Received agent reload request (force={request.force}, schedule={request.schedule_for})")
+    
+    # CASE 1: Scheduled Reload
+    if request.schedule_for:
+        try:
+            from datetime import datetime, timedelta
+            
+            # Parse target time (HH:MM) - strictly using UTC/Server time for simplicity
+            target_time = datetime.strptime(request.schedule_for, "%H:%M").time()
+            now = datetime.utcnow()
+            target_datetime = datetime.combine(now.date(), target_time)
+            
+            # If target time is in the past for today, schedule for tomorrow
+            if target_datetime <= now:
+                target_datetime += timedelta(days=1)
+                
+            delay_seconds = (target_datetime - now).total_seconds()
+            
+            logger.info(f"Scheduling reload for {target_datetime} (in {delay_seconds:.2f}s)")
+            
+            # Define background task wrapper
+            async def scheduled_reload():
+                try:
+                    logger.info(f"⏳ Waiting {delay_seconds:.2f}s for scheduled reload...")
+                    await asyncio.sleep(delay_seconds)
+                    logger.info("🕒 Executing scheduled reload now.")
+                    await orchestrator.reload_agents(force=request.force)
+                except Exception as e:
+                    logger.error(f"Scheduled reload failed: {e}")
+
+            # Fire and forget task
+            asyncio.create_task(scheduled_reload())
+            
+            return JSONResponse(content={
+                "success": True,
+                "status": "scheduled",
+                "message": f"Reload scheduled for {request.schedule_for} UTC",
+                "scheduled_time_iso": target_datetime.isoformat(),
+                "seconds_until_execution": delay_seconds
+            }, status_code=202)
+            
+        except ValueError:
+             raise HTTPException(status_code=400, detail="Invalid time format. Use 'HH:MM' (24-hour UTC).")
+
+    # CASE 2: Immediate Reload (Graceful or Forced)
     try:
-        result = await orchestrator.reload_agents()
+        result = await orchestrator.reload_agents(force=request.force)
 
         if result.get("success"):
             logger.info(f"✅ Agents reloaded successfully: {result['summary']}")

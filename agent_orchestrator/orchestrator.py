@@ -227,6 +227,10 @@ class Orchestrator:
 
         # Execution context
         self._execution_history: List[Dict[str, Any]] = []
+        
+        # State necessary for graceful reloading
+        self._active_requests = 0
+        self._reloading = False
 
         logger.info(f"Orchestrator initialized: {self.config.name}")
 
@@ -317,21 +321,35 @@ class Orchestrator:
             f"{self.agent_registry.count()} agents registered"
         )
 
-    async def reload_agents(self) -> Dict[str, Any]:
+    async def reload_agents(self, force: bool = False) -> Dict[str, Any]:
         """
         Reload agent configuration and re-register agents without restarting the orchestrator.
-
-        This allows adding/removing/updating agents dynamically by:
-        1. Re-loading configuration from agents.yaml
-        2. Cleaning up existing agents
-        3. Re-registering agents from updated config
+        
+        This allows adding/removing/updating agents dynamically.
+        
+        Args:
+            force: If True, interrupt active requests. If False, wait for them to drain.
 
         Returns:
             Dict with reload results including counts and any errors
         """
-        logger.info("🔄 Reloading agents from configuration...")
-
+        logger.info(f"🔄 Reloading agents (force={force})...")
+        
+        # 1. Enter Reloading Mode (Stop accepting new requests)
+        self._reloading = True
+        
         try:
+            # 2. Drain active requests (if not forced)
+            if not force:
+                logger.info(f"Draining active requests (current: {self._active_requests})...")
+                wait_start = time.time()
+                while self._active_requests > 0:
+                    await asyncio.sleep(0.5)
+                    if time.time() - wait_start > 30: # Max 30s drain timeout
+                        logger.warning("Drain timeout reached (30s). Proceeding with reload.")
+                        break
+                logger.info("Draining complete.")
+
             # Re-load configuration
             from .config import load_agents_config
             agents_config_path = os.path.join(
@@ -342,7 +360,7 @@ class Orchestrator:
             old_count = self.agent_registry.count()
             old_agents = list(self.agent_registry.list_agents().keys())
 
-            # Clean up existing agents
+            # Clean up existing agents (AND clear registry due to agent_registry fix)
             await self.agent_registry.cleanup_all()
             logger.info(f"Cleaned up {old_count} existing agents")
 
@@ -419,6 +437,9 @@ class Orchestrator:
                 "error": str(e),
                 "error_type": type(e).__name__,
             }
+        finally:
+            # 3. Exit Reloading Mode (Resume accepting requests)
+            self._reloading = False
 
     def _create_agent(self, config: AgentConfig):
         """
@@ -511,8 +532,16 @@ class Orchestrator:
 
         # Generate request ID if not provided (correlation ID)
         request_id = request_id or str(uuid.uuid4())
+        
+        # Check reloading state
+        if self._reloading:
+             raise RuntimeError("Service is temporarily unavailable (reloading configuration). Please try again in few seconds.")
+
         start_time = datetime.utcnow()
         start_time_monotonic = time.time()
+        
+        # Track active request count for safe draining
+        self._active_requests += 1
 
         # Setup request context (correlation ID and session ID)
         with RequestContext(correlation_id=request_id, session_id=session_id):
@@ -536,6 +565,7 @@ class Orchestrator:
                 )
             finally:
                 # Always decrement active queries
+                self._active_requests -= 1
                 orchestrator_metrics.active_queries.dec()
 
     async def _process_with_observability(

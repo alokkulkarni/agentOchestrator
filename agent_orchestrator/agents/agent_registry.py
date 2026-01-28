@@ -221,22 +221,29 @@ class AgentRegistry:
 
     async def cleanup_all(self) -> None:
         """
-        Cleanup all registered agents.
+        Cleanup all registered agents AND remove them from registry.
 
-        Calls cleanup() on all agents in parallel.
+        Calls cleanup() on all agents in parallel, then clears internal storage.
         """
-        logger.info("Cleaning up all agents")
-        cleanup_tasks = [agent.cleanup() for agent in self._agents.values()]
+        logger.info(f"Cleaning up all agents ({len(self._agents)} agents)")
+        
+        # 1. Clean up resources (close connections)
+        if self._agents:
+            cleanup_tasks = [agent.cleanup() for agent in self._agents.values()]
+            results = await asyncio.gather(*cleanup_tasks, return_exceptions=True)
 
-        results = await asyncio.gather(*cleanup_tasks, return_exceptions=True)
+            for agent, result in zip(self._agents.values(), results):
+                if isinstance(result, Exception):
+                    logger.warning(f"Error during cleanup for agent {agent.name}: {result}")
+                else:
+                    logger.info(f"Agent {agent.name} cleaned up successfully")
 
-        for agent, result in zip(self._agents.values(), results):
-            if isinstance(result, Exception):
-                logger.warning(f"Error during cleanup for agent {agent.name}: {result}")
-            else:
-                logger.info(f"Agent {agent.name} cleaned up successfully")
-
+        # 2. Prevent "zombie" agents by clearing the registry
+        self._agents.clear()
+        self._capability_index.clear()
         self._initialized = False
+        
+        logger.info("Agent registry completely cleared")
 
     def get_stats(self) -> Dict[str, Any]:
         """
