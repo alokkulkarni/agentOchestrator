@@ -18,6 +18,24 @@ mcp_servers:
         args: ["mcp_server_gateway/examples/search_server.py"]
     metadata:
       description: "A server for searching documents and information."
+
+  - name: echo_http
+    capabilities: [echo, test]
+    connection:
+      type: http
+      http:
+        url: http://localhost:8002/sse
+    metadata:
+      description: "Echo server for testing HTTP connection."
+  
+  - name: echo_stream
+    capabilities: [echo, test]
+    connection:
+      type: streamable_http
+      streamable_http:
+        url: http://localhost:8002/sse
+    metadata:
+      description: "Echo server for testing Streamable HTTP connection."
       
   - name: echo_http
     capabilities: [echo, test]
