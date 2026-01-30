@@ -11,6 +11,7 @@ from mcp.client.stdio import stdio_client
 
 async def run_test():
     print("=== Testing Gateway Interface via MCP Client ===")
+    print("Initializing connection to mcp_server_gateway/interface.py...")
     
     # Define server parameters - point to our new interface
     server_params = StdioServerParameters(
@@ -26,13 +27,16 @@ async def run_test():
     
     try:
         async with stdio_client(server_params) as (read, write):
+            print("Connected to STDIO process. Establishing MCP session...")
             async with ClientSession(read, write) as session:
                 # Initialize
                 await session.initialize()
+                print("MCP Session initialized.")
                 
                 # List tools to verify connection
+                print("Listing available tools...")
                 tools = await session.list_tools()
-                print(f"\nConnected to Gateway. Available tools: {[t.name for t in tools.tools]}")
+                print(f"Available tools: {[t.name for t in tools.tools]}")
                 
                 # Test Cases
                 test_queries = [

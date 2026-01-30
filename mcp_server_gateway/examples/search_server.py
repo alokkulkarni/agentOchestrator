@@ -65,7 +65,5 @@ async def search_documents(query: str, max_results: int = 10) -> List[Dict[str, 
     return results[:max_results]
 
 if __name__ == "__main__":
-    mcp.run()
-
-if __name__ == "__main__":
+    # Force stdio transport
     mcp.run(transport="stdio")

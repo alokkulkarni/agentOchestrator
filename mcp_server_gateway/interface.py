@@ -7,7 +7,7 @@ from fastmcp import FastMCP
 from typing import Dict, Any, Optional
 
 # Configure logging
-logging.basicConfig(level=logging.ERROR)
+logging.basicConfig(level=logging.INFO, stream=sys.stderr)
 logger = logging.getLogger("mcp_gateway_interface")
 
 # Initialize FastMCP Server
@@ -73,5 +73,5 @@ async def query_gateway(
         return f"System Error: {str(e)}"
 
 if __name__ == "__main__":
-    # Run via stdio by default which is what FastMCP does
-    mcp.run()
+    # Explicitly use stdio transport for MCP client compatibility
+    mcp.run(transport='stdio')

@@ -53,7 +53,6 @@ def calculate(operation: str, operands: List[float]) -> float:
     raise ValueError(f"Unknown operation: {operation}")
 
 if __name__ == "__main__":
-    mcp.run()
-
-if __name__ == "__main__":
+    import sys
+    # Force stdio transport
     mcp.run(transport="stdio")

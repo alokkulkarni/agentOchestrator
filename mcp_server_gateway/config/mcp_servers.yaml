@@ -21,6 +21,7 @@ mcp_servers:
 
   - name: echo_http
     capabilities: [echo, test]
+    enabled: false
     connection:
       type: http
       http:
@@ -30,6 +31,7 @@ mcp_servers:
   
   - name: echo_stream
     capabilities: [echo, test]
+    enabled: false
     connection:
       type: streamable_http
       streamable_http:
