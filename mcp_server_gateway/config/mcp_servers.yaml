@@ -1,0 +1,40 @@
+mcp_servers:
+  - name: calculator
+    capabilities: [calculator, math]
+    connection:
+      type: stdio
+      stdio:
+        command: python
+        args: ["mcp_server_gateway/examples/math_server.py"]
+    metadata:
+      description: "A server for performing mathematical calculations (add, subtract, multiply, divide)."
+
+  - name: search
+    capabilities: [search, information_retrieval]
+    connection:
+      type: stdio
+      stdio:
+        command: python
+        args: ["mcp_server_gateway/examples/search_server.py"]
+    metadata:
+      description: "A server for searching documents and information."
+      
+  - name: echo_http
+    capabilities: [echo, test]
+    enabled: false # Disabled by default as it requires separate process
+    connection:
+      type: http
+      http:
+        url: "http://localhost:8002/sse"
+    metadata:
+      description: "Example HTTP-connected server."
+
+  - name: echo_streamable
+    capabilities: [echo_stream, test]
+    enabled: false
+    connection:
+      type: streamable_http
+      streamable_http:
+        url: "http://localhost:8002/sse"
+    metadata:
+      description: "Example Streamable HTTP-connected server."

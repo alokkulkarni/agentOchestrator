@@ -390,15 +390,15 @@ class GatewayReasoner:
         context: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Build prompt for agent routing decision."""
-        prompt = f"""You are an intelligent MCP orchestration system. Your role is to:
+        prompt = f"""You are an intelligent agent orchestration system. Your role is to:
 1. Carefully analyze the user's query
 2. Think step-by-step about what the query is asking for
 3. Plan the best approach to fulfill the request
-4. Select the appropriate tool(s) to execute the plan
+4. Select the appropriate agent(s) to execute the plan
 
 User Query: {query}
 
-Available Tools:
+Available Agents:
 """
         for idx, agent in enumerate(agent_capabilities, 1):
             name = agent.name
@@ -416,168 +416,168 @@ Available Tools:
 
 YOUR THINKING PROCESS:
 0. CRITICAL - Intent Classification First:
-   Before selecting tools, classify the query intent:
+   Before selecting agents, classify the query intent:
    
    A) PERSONAL ACCOUNT QUERY vs GENERAL INFORMATION:
       Look for possessive indicators: "my", "mine", "I", "me"
       
       Personal (REJECT):
-      - "What is MY credit card balance?" → Contains "MY" → TOOLS: none
-      - "Show ME my transactions" → Contains "ME/MY" → TOOLS: none
-      - "I want to check MY balance" → Contains "I/MY" → TOOLS: none
+      - "What is MY credit card balance?" → Contains "MY" → AGENTS: none
+      - "Show ME my transactions" → Contains "ME/MY" → AGENTS: none
+      - "I want to check MY balance" → Contains "I/MY" → AGENTS: none
       
       General (ALLOW):
-      - "What credit cards does Virgin Money offer?" → No possessive → TOOLS: search
-      - "How to apply for credit card?" → No possessive → TOOLS: search
-      - "Credit card interest rates comparison" → No possessive → TOOLS: search
+      - "What credit cards does Virgin Money offer?" → No possessive → AGENTS: tavily_search
+      - "How to apply for credit card?" → No possessive → AGENTS: tavily_search
+      - "Credit card interest rates comparison" → No possessive → AGENTS: tavily_search
    
    B) FINANCIAL PRODUCTS - Key Distinction:
       "MY [financial product]" = Personal account (REJECT)
       "[financial product] products/offers/information" = General info (ALLOW)
       
       Examples:
-      - "MY credit card balance" → TOOLS: none
-      - "MY loan status" → TOOLS: none
-      - "MY mortgage payment" → TOOLS: none
-      - "Credit card offers" → TOOLS: search
-      - "Mortgage rates" → TOOLS: search
-      - "Loan products available" → TOOLS: search
+      - "MY credit card balance" → AGENTS: none
+      - "MY loan status" → AGENTS: none
+      - "MY mortgage payment" → AGENTS: none
+      - "Credit card offers" → AGENTS: tavily_search
+      - "Mortgage rates" → AGENTS: tavily_search
+      - "Loan products available" → AGENTS: tavily_search
 
-1. ONLY select tools whose capabilities DIRECTLY match the query intent
-2. CRITICAL - NEVER call planning tool:
+1. ONLY select agents whose capabilities DIRECTLY match the query intent
+2. CRITICAL - NEVER call planning agent:
    - The orchestrator handles ALL planning and synthesis internally
-   - Planning tool is DISABLED and should NEVER be selected
-   - For ANY query requiring planning/synthesis: Use search tools, orchestrator synthesizes
-   - Examples that should NOT use planning tool:
-     * "steps to buy a house" → TOOLS: search (orchestrator synthesizes)
-     * "plan a trip" → TOOLS: search (orchestrator synthesizes)
-     * "how to start a business" → TOOLS: search (orchestrator synthesizes)
-     * "create an app plan" → TOOLS: search (orchestrator synthesizes)
-3. Information Queries: ONLY use search tools (orchestrator will synthesize)
-   - Search tools gather information
+   - Planning agent is DISABLED and should NEVER be selected
+   - For ANY query requiring planning/synthesis: Use search agents, orchestrator synthesizes
+   - Examples that should NOT use planning agent:
+     * "steps to buy a house" → AGENTS: search, tavily_search (orchestrator synthesizes)
+     * "plan a trip" → AGENTS: search, tavily_search (orchestrator synthesizes)
+     * "how to start a business" → AGENTS: search, tavily_search (orchestrator synthesizes)
+     * "create an app plan" → AGENTS: search, tavily_search (orchestrator synthesizes)
+3. Information Queries: ONLY use search agents (orchestrator will synthesize)
+   - Search agents gather information
    - MODE should be sequential
    - Orchestrator will internally synthesize a coherent response
-   - Example 1: "what are the steps to buy a house" → TOOLS: search
-   - Example 2: "how to start a business in UK" → TOOLS: search
-   - Example 3: "explain the process of applying for a visa" → TOOLS: search
-4. Trip/Travel Planning: ONLY use search tools (orchestrator synthesizes)
-   - Example: "plan trip from Manchester to Penrith" → TOOLS: search
-5. Weather tool: ONLY for direct weather/forecast queries
-   - Example: "weather in London" → TOOLS: weather
-6. Calculator tool: ONLY for mathematical calculations
-7. Search tool selection - CRITICAL distinction:
-   - 'search' tool: Searches LOCAL workspace files/documents
+   - Example 1: "what are the steps to buy a house" → AGENTS: search, tavily_search
+   - Example 2: "how to start a business in UK" → AGENTS: search, tavily_search
+   - Example 3: "explain the process of applying for a visa" → AGENTS: search, tavily_search
+4. Trip/Travel Planning: ONLY use search agents (orchestrator synthesizes)
+   - Example: "plan trip from Manchester to Penrith" → AGENTS: search, tavily_search
+5. Weather agent: ONLY for direct weather/forecast queries
+   - Example: "weather in London" → AGENTS: weather
+6. Calculator agent: ONLY for mathematical calculations
+7. Search agent selection - CRITICAL distinction:
+   - 'search' agent: Searches LOCAL workspace files/documents
      * Use ONLY for code-related queries or workspace content
      * Example: "find function in my code", "what files do I have"
-   - 'web_search' tool: Searches the INTERNET using AI web search
+   - 'tavily_search' agent: Searches the INTERNET using AI web search
      * Use for real-world information, products, services, companies
      * Example: "Virgin Money credit cards", "buy house in UK", "trip to Paris"
-   - For general information queries about real-world topics: ALWAYS use web_search
-   - For trip planning: Use BOTH search + web_search sequentially
+   - For general information queries about real-world topics: ALWAYS use tavily_search
+   - For trip planning: Use BOTH search + tavily_search sequentially
    - NEVER use 'search' alone for real-world information queries
 9. IMPORTANT - Queries that MUST return "none" (strictly enforced):
-   THESE ARE ACCOUNT-SPECIFIC QUERIES - NO TOOLS CAN HELP:
+   THESE ARE ACCOUNT-SPECIFIC QUERIES - NO AGENTS CAN HELP:
    
    a) Balance & Account Viewing:
-      - "check my balance", "want to check my balance", "know my balance" → TOOLS: none
-      - "current balance", "account balance", "my balance", "show balance" → TOOLS: none
-      - "view my account", "see my account", "view account" → TOOLS: none
-      - ANY query with "want to check" + "balance" → TOOLS: none
-      - ANY query with "want to know" + "balance" → TOOLS: none
+      - "check my balance", "want to check my balance", "know my balance" → AGENTS: none
+      - "current balance", "account balance", "my balance", "show balance" → AGENTS: none
+      - "view my account", "see my account", "view account" → AGENTS: none
+      - ANY query with "want to check" + "balance" → AGENTS: none
+      - ANY query with "want to know" + "balance" → AGENTS: none
    
    b) Financial Transactions:
-      - "transfer money", "send money", "make payment", "pay bill" → TOOLS: none
-      - "transaction history", "recent transactions" → TOOLS: none
+      - "transfer money", "send money", "make payment", "pay bill" → AGENTS: none
+      - "transaction history", "recent transactions" → AGENTS: none
    
    c) Account Management:
-      - "change my address", "update address", "change password", "reset password" → TOOLS: none
+      - "change my address", "update address", "change password", "reset password" → AGENTS: none
    
    d) Customer Service:
-      - "speak to representative", "customer service", "call center" → TOOLS: none
+      - "speak to representative", "customer service", "call center" → AGENTS: none
    
    EXAMPLES - ALL MUST RETURN "none":
-   ✅ "I want to check my current account balance" → TOOLS: none
-   ✅ "I want to know my balance" → TOOLS: none  
-   ✅ "What is my account balance?" → TOOLS: none
-   ✅ "Check my balance" → TOOLS: none
-   ✅ "Show me my transactions" → TOOLS: none
-   ✅ "Transfer $100 to John" → TOOLS: none
-   ✅ "Change my address" → TOOLS: none
-10. If NO tool capabilities match the query, MUST respond with: TOOLS: none
-11. For trip/travel/route planning queries: Use search tools (orchestrator synthesizes)
-12. Do NOT try to be helpful by selecting loosely related tools - be strict about capability matching
+   ✅ "I want to check my current account balance" → AGENTS: none
+   ✅ "I want to know my balance" → AGENTS: none  
+   ✅ "What is my account balance?" → AGENTS: none
+   ✅ "Check my balance" → AGENTS: none
+   ✅ "Show me my transactions" → AGENTS: none
+   ✅ "Transfer $100 to John" → AGENTS: none
+   ✅ "Change my address" → AGENTS: none
+10. If NO agent capabilities match the query, MUST respond with: AGENTS: none
+11. For trip/travel/route planning queries: Use search agents (orchestrator synthesizes)
+12. Do NOT try to be helpful by selecting loosely related agents - be strict about capability matching
 
 13. INTELLIGENT CLASSIFICATION - If rules don't catch it:
     Even if the exact pattern isn't in rules, YOU must classify correctly based on intent:
     - Look for possessive pronouns (my, mine, I, me, our)
     - Combined with financial terms (balance, transaction, account, card, loan, mortgage)
-    - This indicates PERSONAL account query → TOOLS: none
+    - This indicates PERSONAL account query → AGENTS: none
     - Note in reasoning: "Classified as account-specific despite missing specific rule pattern"
     
     Example Intelligence:
     Query: "what is my savings account balance"
     - Contains: "my" + "balance" → Personal account query
     - Even if "savings account balance" not in rules
-    - YOU decide: TOOLS: none
+    - YOU decide: AGENTS: none
     - Reasoning: "Personal account query (possessive 'my' + financial term 'balance')"
 
 CRITICAL EXAMPLES - Intent Classification:
 
 GENERAL INFORMATION (Supported):
-- "Virgin Money credit cards" → TOOLS: web_search (general product info)
-- "What credit cards does Bank X offer?" → TOOLS: web_search (general products)
-- "steps to buy a house in UK" → TOOLS: web_search (general process)
-- "How to apply for mortgage?" → TOOLS: web_search (general how-to)
-- "Credit card interest rates" → TOOLS: web_search (general comparison)
+- "Virgin Money credit cards" → AGENTS: tavily_search (general product info)
+- "What credit cards does Bank X offer?" → AGENTS: tavily_search (general products)
+- "steps to buy a house in UK" → AGENTS: tavily_search (general process)
+- "How to apply for mortgage?" → AGENTS: tavily_search (general how-to)
+- "Credit card interest rates" → AGENTS: tavily_search (general comparison)
 
 PERSONAL ACCOUNT QUERIES (Unsupported - contains possessive):
-- "What is MY credit card balance?" → TOOLS: none (possessive "MY")
-- "Show ME my transactions" → TOOLS: none (possessive "ME/MY")
-- "I want MY account balance" → TOOLS: none (possessive "I/MY")
-- "MY loan status" → TOOLS: none (possessive "MY")
-- "Check MY credit card" → TOOLS: none (possessive "MY")
+- "What is MY credit card balance?" → AGENTS: none (possessive "MY")
+- "Show ME my transactions" → AGENTS: none (possessive "ME/MY")
+- "I want MY account balance" → AGENTS: none (possessive "I/MY")
+- "MY loan status" → AGENTS: none (possessive "MY")
+- "Check MY credit card" → AGENTS: none (possessive "MY")
 
 WORKSPACE QUERIES (Supported):
-- "what files are in my project" → TOOLS: search (local workspace)
-- "find function called handleClick" → TOOLS: search (local code)
+- "what files are in my project" → AGENTS: search (local workspace)
+- "find function called handleClick" → AGENTS: search (local code)
 
 TRIP PLANNING (Supported):
-- "plan trip from Manchester to Penrith" → TOOLS: search, web_search
+- "plan trip from Manchester to Penrith" → AGENTS: search, tavily_search
 
-Based on the query and available tools, respond with:
-1. Which tool(s) should be called (you CAN call same tool multiple times)
+Based on the query and available agents, respond with:
+1. Which agent(s) should be called (you CAN call same agent multiple times)
 2. Whether they should run in parallel or sequential
 3. Brief reasoning for your choice
-4. Tool-specific parameters extracted from the query
+4. Agent-specific parameters extracted from the query
 
 IMPORTANT - Multi-Instance Support:
-  - You CAN call the same tool multiple times with different parameters
-  - For multiple calls, use numbered suffixes: tool_1, tool_2, etc.
+  - You CAN call the same agent multiple times with different parameters
+  - For multiple calls, use numbered suffixes: agent_1, agent_2, etc.
   - Example: For "weather in Paris and London":
-    TOOLS: weather, weather
+    AGENTS: weather, weather
     PARAMETERS: {"weather_1": {"location": "Paris"}, "weather_2": {"location": "London"}}
 
 Parameter Extraction Guidelines:
-  For calculator tool - REQUIRED FORMAT:
+  For calculator agent - REQUIRED FORMAT:
     - "operation": Use EXACT values: "add", "subtract", "multiply", "divide", "average", "power", "sqrt"
     - "operands": MUST be a list of numbers [num1, num2, ...], OR
-    - "data_source": "previous" to use data from earlier tools
+    - "data_source": "previous" to use data from earlier agents
     - "field": Field to extract (e.g., "temp" for temperature)
     Examples:
       "25 + 75" → {"operation": "add", "operands": [25, 75]}
       "average temperature from previous results" → {"operation": "average", "data_source": "previous", "field": "temp"}
 
-  For weather tool:
+  For weather agent:
     - "location": City/location name as string
     Example: "weather in Paris" → {"location": "Paris"}
 
-  For search tools:
+  For search agents:
     - "keywords": List of search terms
     Example: "search for AI" → {"keywords": ["AI"]}
 
 Data Chaining Example:
   Query: "weather in Paris and London, calculate average"
-  TOOLS: weather, weather, calculator
+  AGENTS: weather, weather, calculator
   MODE: sequential
   PARAMETERS: {
     "weather_1": {"location": "Paris"},
@@ -586,10 +586,10 @@ Data Chaining Example:
   }
 
 Format your response as:
-TOOLS: [tool names separated by commas, OR "none" if no tool matches]
+AGENTS: [agent names separated by commas, OR "none" if no agent matches]
 MODE: [parallel or sequential]
-REASONING: [your reasoning - explain why you selected these tools or why none match]
-PARAMETERS: {"tool_name": {"param": value}, ...} (as JSON, MUST match exact format above)
+REASONING: [your reasoning - explain why you selected these agents or why none match]
+PARAMETERS: {"agent_name": {"param": value}, ...} (as JSON, MUST match exact format above)
 """
         return prompt
 
@@ -600,9 +600,9 @@ PARAMETERS: {"tool_name": {"param": value}, ...} (as JSON, MUST match exact form
         expected_schema: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Build prompt for output validation."""
-        prompt = f"""You are validating the output from a tool.
+        prompt = f"""You are validating the output from an agent.
 
-Tool: {agent_name}
+Agent: {agent_name}
 Output: {agent_output}
 """
 
@@ -644,10 +644,10 @@ Respond with either:
             agent_context += f"- {name}: {', '.join(caps)}\n"
 
         # Build validation prompt
-        prompt = f"""You are an AI tool router validator. A rule-based system has selected tools to handle a user request.
-Your job is to validate if these tools are appropriate, extract parameters for each tool, or suggest better tools if needed.
+        prompt = f"""You are an AI agent router validator. A rule-based system has selected agents to handle a user request.
+Your job is to validate if these agents are appropriate, extract parameters for each agent, or suggest better agents if needed.
 
-Available Tools:
+Available Agents:
 {agent_context}
 
 User Request:
@@ -655,25 +655,25 @@ User Request:
 
 Rule-Based Selection:
 - Rule: {rule_name}
-- Selected Tools: {', '.join(rule_selected_agents)}
+- Selected Agents: {', '.join(rule_selected_agents)}
 
 Task:
-1. Analyze if the selected tools are appropriate for this request
-2. Extract specific parameters needed for each tool from the user request
+1. Analyze if the selected agents are appropriate for this request
+2. Extract specific parameters needed for each agent from the user request
 3. If the selection is good, validate it
-4. If not appropriate, suggest which tools should be used instead
+4. If not appropriate, suggest which agents should be used instead
 
 IMPORTANT - Multi-Instance Support:
-- You CAN suggest calling the same tool multiple times with different parameters
-- For multiple calls, list the tool name multiple times in suggested_tools array
+- You CAN suggest calling the same agent multiple times with different parameters
+- For multiple calls, list the agent name multiple times in suggested_agents array
 - Use numbered suffixes in parameters (e.g., weather_1, weather_2, weather_3)
 
 Example for "weather in Paris, London, and Berlin":
 {{
     "is_valid": false,
     "confidence": 0.9,
-    "reasoning": "Need to call weather tool three times for three cities",
-    "suggested_tools": ["weather", "weather", "weather"],
+    "reasoning": "Need to call weather agent three times for three cities",
+    "suggested_agents": ["weather", "weather", "weather"],
     "parameters": {{
         "weather_1": {{"location": "Paris"}},
         "weather_2": {{"location": "London"}},
@@ -681,7 +681,7 @@ Example for "weather in Paris, London, and Berlin":
     }}
 }}
 
-For data chaining (when one tool needs output from previous tools):
+For data chaining (when one agent needs output from previous agents):
 - Use "data_source": "previous" in parameters
 - Specify field to extract with "field": "temp"
 - Example: {{"calculator": {{"operation": "average", "data_source": "previous", "field": "temp"}}}}
@@ -691,8 +691,8 @@ Respond in JSON format:
     "is_valid": true/false,
     "confidence": 0.0-1.0,
     "reasoning": "explanation",
-    "suggested_tools": ["tool1", "tool1", "tool2"] (can include duplicates),
-    "parameters": {{"tool_name_1": {{"param": "value"}}, "tool_name_2": {{"param": "value"}}}}
+    "suggested_agents": ["agent1", "agent1", "agent2"] (can include duplicates),
+    "parameters": {{"agent_name_1": {{"param": "value"}}, "agent_name_2": {{"param": "value"}}}}
 }}"""
 
         # Create messages
@@ -810,31 +810,18 @@ Respond in JSON format:
         reasoning = response_text
         parameters = {}
 
-        # Extract tools (formerly agents)
-        if "TOOLS:" in response_text:
-            tools_line = response_text.split("TOOLS:")[1].split("\n")[0].strip()
-            
-            # Check if response is "none" - meaning no suitable tool found
-            if tools_line.lower() == "none":
-                logger.info("AI reasoner determined no suitable tool for query")
-                return None
-            
-            tool_names = [a.strip() for a in tools_line.split(",")]
-
-            # Match to actual agent objects
-            for name in tool_names:
-                for agent in agent_capabilities:
-                    if agent.name.lower() == name.lower():
-                        agents.append(agent.name)
-                        break
-        # Fallback for backward compatibility or if model uses AGENTS:
-        elif "AGENTS:" in response_text:
+        # Extract agents
+        if "AGENTS:" in response_text:
             agents_line = response_text.split("AGENTS:")[1].split("\n")[0].strip()
             
+            # Check if response is "none" - meaning no suitable agent found
             if agents_line.lower() == "none":
+                logger.info("AI reasoner determined no suitable agent for query")
                 return None
             
             agent_names = [a.strip() for a in agents_line.split(",")]
+
+            # Match to actual agent objects
             for name in agent_names:
                 for agent in agent_capabilities:
                     if agent.name.lower() == name.lower():
